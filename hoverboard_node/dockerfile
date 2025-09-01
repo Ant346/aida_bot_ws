@@ -1,0 +1,54 @@
+FROM ros:humble
+
+# Install system dependencies including zsh
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    cmake \
+    python3-pip \
+    python3-serial \
+    python3-numpy \
+    vim \
+    nano \
+    tmux \
+    zsh \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set the working directory
+WORKDIR /workspace
+
+# Set zsh as the default shell
+SHELL ["/bin/zsh", "-c"]
+
+# Install Oh My Zsh and plugins
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended && \
+    ZSH_CUSTOM=${ZSH_CUSTOM:-/root/.oh-my-zsh/custom} && \
+    git clone https://github.com/zsh-users/zsh-autosuggestions.git $ZSH_CUSTOM/plugins/zsh-autosuggestions && \
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git $ZSH_CUSTOM/plugins/zsh-syntax-highlighting && \
+    sed -i 's/plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/' /root/.zshrc
+
+# Install Python dependencies
+RUN pip3 install --no-cache-dir \
+    numpy \
+    pyserial \
+    matplotlib
+
+# Source ROS2 in zsh profile
+RUN echo "source /opt/ros/humble/setup.zsh" >> /root/.zshrc && \
+    echo "source /workspace/install/setup.zsh" >> /root/.zshrc
+
+# Copy tmux configuration
+COPY .tmux.conf /root/.tmux.conf
+
+# Copy entrypoint script
+COPY entrypoint.bash /entrypoint.bash
+RUN chmod +x /entrypoint.bash
+
+# Copy ROS2 session script
+COPY start_ros2_session.sh /usr/local/bin/start_ros2_session.sh
+RUN chmod +x /usr/local/bin/start_ros2_session.sh
+
+# Set default command to zsh
+CMD ["/bin/zsh"]
+

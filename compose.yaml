@@ -1,0 +1,28 @@
+services:
+  ds4driver:
+    build:
+      context: ./ds4_driver/docker
+      dockerfile: Dockerfile
+    volumes:
+      - ./ds4_driver:/workspace/ds4_driver
+      - /dev:/dev
+    environment:
+      - ROS_DISTRO=humble
+    entrypoint: ["/entrypoint.bash"]
+    command: ["ros2", "launch", "ds4_driver", "ds4_twist.launch.xml"]
+    privileged: true
+
+  hoverboard_node:
+    build:
+      context: ./hoverboard_node
+      dockerfile: dockerfile
+    volumes:
+      - ./hoverboard_node:/workspace/hoverboard_node
+      - /dev:/dev
+    environment:
+      - ROS_DISTRO=humble
+    entrypoint: ["/entrypoint.bash"]
+    command: ["/bin/zsh"]
+    privileged: true
+    stdin_open: true
+    tty: true

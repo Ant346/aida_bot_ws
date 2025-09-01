@@ -1,0 +1,45 @@
+running egg_info
+creating build/hoverboard_node/hoverboard_node.egg-info
+writing build/hoverboard_node/hoverboard_node.egg-info/PKG-INFO
+writing dependency_links to build/hoverboard_node/hoverboard_node.egg-info/dependency_links.txt
+writing entry points to build/hoverboard_node/hoverboard_node.egg-info/entry_points.txt
+writing requirements to build/hoverboard_node/hoverboard_node.egg-info/requires.txt
+writing top-level names to build/hoverboard_node/hoverboard_node.egg-info/top_level.txt
+writing manifest file 'build/hoverboard_node/hoverboard_node.egg-info/SOURCES.txt'
+reading manifest file 'build/hoverboard_node/hoverboard_node.egg-info/SOURCES.txt'
+writing manifest file 'build/hoverboard_node/hoverboard_node.egg-info/SOURCES.txt'
+running build
+running build_py
+creating /workspace/hoverboard_node/build/hoverboard_node/build
+creating /workspace/hoverboard_node/build/hoverboard_node/build/lib
+creating /workspace/hoverboard_node/build/hoverboard_node/build/lib/hoverboard_driver
+copying hoverboard_driver/manual_wheel_control.py -> /workspace/hoverboard_node/build/hoverboard_node/build/lib/hoverboard_driver
+copying hoverboard_driver/hoverboard_driver.py -> /workspace/hoverboard_node/build/hoverboard_node/build/lib/hoverboard_driver
+copying hoverboard_driver/test_rs485.py -> /workspace/hoverboard_node/build/hoverboard_node/build/lib/hoverboard_driver
+copying hoverboard_driver/__init__.py -> /workspace/hoverboard_node/build/hoverboard_node/build/lib/hoverboard_driver
+running install
+running install_lib
+creating /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_driver
+copying /workspace/hoverboard_node/build/hoverboard_node/build/lib/hoverboard_driver/manual_wheel_control.py -> /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_driver
+copying /workspace/hoverboard_node/build/hoverboard_node/build/lib/hoverboard_driver/hoverboard_driver.py -> /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_driver
+copying /workspace/hoverboard_node/build/hoverboard_node/build/lib/hoverboard_driver/test_rs485.py -> /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_driver
+copying /workspace/hoverboard_node/build/hoverboard_node/build/lib/hoverboard_driver/__init__.py -> /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_driver
+byte-compiling /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_driver/manual_wheel_control.py to manual_wheel_control.cpython-310.pyc
+byte-compiling /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_driver/hoverboard_driver.py to hoverboard_driver.cpython-310.pyc
+byte-compiling /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_driver/test_rs485.py to test_rs485.cpython-310.pyc
+byte-compiling /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_driver/__init__.py to __init__.cpython-310.pyc
+running install_data
+creating /workspace/hoverboard_node/install/hoverboard_node/share/ament_index
+creating /workspace/hoverboard_node/install/hoverboard_node/share/ament_index/resource_index
+creating /workspace/hoverboard_node/install/hoverboard_node/share/ament_index/resource_index/packages
+copying resource/hoverboard_node -> /workspace/hoverboard_node/install/hoverboard_node/share/ament_index/resource_index/packages
+copying package.xml -> /workspace/hoverboard_node/install/hoverboard_node/share/hoverboard_node
+creating /workspace/hoverboard_node/install/hoverboard_node/share/hoverboard_node/launch
+copying hoverboard_node/launch/hoverboard_driver.launch.py -> /workspace/hoverboard_node/install/hoverboard_node/share/hoverboard_node/launch
+running install_egg_info
+Copying build/hoverboard_node/hoverboard_node.egg-info to /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_node-0.0.1-py3.10.egg-info
+running install_scripts
+Installing hoverboard_driver script to /workspace/hoverboard_node/install/hoverboard_node/lib/hoverboard_node
+Installing manual_wheel_control script to /workspace/hoverboard_node/install/hoverboard_node/lib/hoverboard_node
+Installing test_rs485 script to /workspace/hoverboard_node/install/hoverboard_node/lib/hoverboard_node
+writing list of installed files to '/workspace/hoverboard_node/build/hoverboard_node/install.log'

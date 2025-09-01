@@ -1,0 +1,59 @@
+[0.000000] (-) TimerEvent: {}
+[0.000475] (hoverboard_node) JobQueued: {'identifier': 'hoverboard_node', 'dependencies': OrderedDict()}
+[0.000496] (hoverboard_node) JobStarted: {'identifier': 'hoverboard_node'}
+[0.099748] (-) TimerEvent: {}
+[0.200027] (-) TimerEvent: {}
+[0.300390] (-) TimerEvent: {}
+[0.400669] (-) TimerEvent: {}
+[0.500946] (-) TimerEvent: {}
+[0.537210] (hoverboard_node) Command: {'cmd': ['/usr/bin/python3', '-W', 'ignore:setup.py install is deprecated', '-W', 'ignore:easy_install command is deprecated', 'setup.py', 'egg_info', '--egg-base', 'build/hoverboard_node', 'build', '--build-base', '/workspace/hoverboard_node/build/hoverboard_node/build', 'install', '--record', '/workspace/hoverboard_node/build/hoverboard_node/install.log', '--single-version-externally-managed', 'install_data'], 'cwd': '/workspace/hoverboard_node', 'env': {'TMUX': '/tmp/tmux-0/default,173,0', 'LANGUAGE': 'en_US', 'HOSTNAME': 'a25315dd563a', 'SHLVL': '3', 'LD_LIBRARY_PATH': '/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib', 'HOME': '/root', 'OLDPWD': '/', 'TERM_PROGRAM_VERSION': '3.2a', 'ZSH': '/root/.oh-my-zsh', 'LSCOLORS': 'Gxfxcxdxbxegedabagacad', 'ROS_PYTHON_VERSION': '3', 'PAGER': 'more', 'ROS_DISTRO': 'humble', 'LOGNAME': 'root', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'TERM': 'screen', 'ROS_LOCALHOST_ONLY': '0', 'PATH': '/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'DISPLAY': ':0', 'MAMBA_ROOT_PREFIX': '/home/ilya/micromamba', 'LANG': 'en_US.UTF-8', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:', 'TERM_PROGRAM': 'tmux', 'AMENT_PREFIX_PATH': '/opt/ros/humble', 'SHELL': '/bin/bash', 'MAMBA_EXE': '/home/ilya/.local/bin/micromamba', 'PWD': '/workspace/hoverboard_node/build/hoverboard_node', 'LC_ALL': 'en_US.UTF-8', 'PYTHONPATH': '/workspace/hoverboard_node/build/hoverboard_node/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages', 'COLCON': '1', 'TMUX_PANE': '%0'}, 'shell': False}
+[0.601034] (-) TimerEvent: {}
+[0.701282] (-) TimerEvent: {}
+[0.713077] (hoverboard_node) StdoutLine: {'line': b'running egg_info\n'}
+[0.713544] (hoverboard_node) StdoutLine: {'line': b'creating build/hoverboard_node/hoverboard_node.egg-info\n'}
+[0.713705] (hoverboard_node) StdoutLine: {'line': b'writing build/hoverboard_node/hoverboard_node.egg-info/PKG-INFO\n'}
+[0.713862] (hoverboard_node) StdoutLine: {'line': b'writing dependency_links to build/hoverboard_node/hoverboard_node.egg-info/dependency_links.txt\n'}
+[0.713941] (hoverboard_node) StdoutLine: {'line': b'writing entry points to build/hoverboard_node/hoverboard_node.egg-info/entry_points.txt\n'}
+[0.714004] (hoverboard_node) StdoutLine: {'line': b'writing requirements to build/hoverboard_node/hoverboard_node.egg-info/requires.txt\n'}
+[0.714056] (hoverboard_node) StdoutLine: {'line': b'writing top-level names to build/hoverboard_node/hoverboard_node.egg-info/top_level.txt\n'}
+[0.714134] (hoverboard_node) StdoutLine: {'line': b"writing manifest file 'build/hoverboard_node/hoverboard_node.egg-info/SOURCES.txt'\n"}
+[0.715251] (hoverboard_node) StdoutLine: {'line': b"reading manifest file 'build/hoverboard_node/hoverboard_node.egg-info/SOURCES.txt'\n"}
+[0.715773] (hoverboard_node) StdoutLine: {'line': b"writing manifest file 'build/hoverboard_node/hoverboard_node.egg-info/SOURCES.txt'\n"}
+[0.715836] (hoverboard_node) StdoutLine: {'line': b'running build\n'}
+[0.715895] (hoverboard_node) StdoutLine: {'line': b'running build_py\n'}
+[0.715939] (hoverboard_node) StdoutLine: {'line': b'creating /workspace/hoverboard_node/build/hoverboard_node/build\n'}
+[0.715996] (hoverboard_node) StdoutLine: {'line': b'creating /workspace/hoverboard_node/build/hoverboard_node/build/lib\n'}
+[0.716058] (hoverboard_node) StdoutLine: {'line': b'creating /workspace/hoverboard_node/build/hoverboard_node/build/lib/hoverboard_driver\n'}
+[0.716096] (hoverboard_node) StdoutLine: {'line': b'copying hoverboard_driver/manual_wheel_control.py -> /workspace/hoverboard_node/build/hoverboard_node/build/lib/hoverboard_driver\n'}
+[0.716137] (hoverboard_node) StdoutLine: {'line': b'copying hoverboard_driver/hoverboard_driver.py -> /workspace/hoverboard_node/build/hoverboard_node/build/lib/hoverboard_driver\n'}
+[0.716195] (hoverboard_node) StdoutLine: {'line': b'copying hoverboard_driver/test_rs485.py -> /workspace/hoverboard_node/build/hoverboard_node/build/lib/hoverboard_driver\n'}
+[0.716233] (hoverboard_node) StdoutLine: {'line': b'copying hoverboard_driver/__init__.py -> /workspace/hoverboard_node/build/hoverboard_node/build/lib/hoverboard_driver\n'}
+[0.716395] (hoverboard_node) StdoutLine: {'line': b'running install\n'}
+[0.716613] (hoverboard_node) StdoutLine: {'line': b'running install_lib\n'}
+[0.717109] (hoverboard_node) StdoutLine: {'line': b'creating /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_driver\n'}
+[0.717169] (hoverboard_node) StdoutLine: {'line': b'copying /workspace/hoverboard_node/build/hoverboard_node/build/lib/hoverboard_driver/manual_wheel_control.py -> /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_driver\n'}
+[0.717226] (hoverboard_node) StdoutLine: {'line': b'copying /workspace/hoverboard_node/build/hoverboard_node/build/lib/hoverboard_driver/hoverboard_driver.py -> /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_driver\n'}
+[0.717282] (hoverboard_node) StdoutLine: {'line': b'copying /workspace/hoverboard_node/build/hoverboard_node/build/lib/hoverboard_driver/test_rs485.py -> /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_driver\n'}
+[0.717335] (hoverboard_node) StdoutLine: {'line': b'copying /workspace/hoverboard_node/build/hoverboard_node/build/lib/hoverboard_driver/__init__.py -> /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_driver\n'}
+[0.717625] (hoverboard_node) StdoutLine: {'line': b'byte-compiling /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_driver/manual_wheel_control.py to manual_wheel_control.cpython-310.pyc\n'}
+[0.718537] (hoverboard_node) StdoutLine: {'line': b'byte-compiling /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_driver/hoverboard_driver.py to hoverboard_driver.cpython-310.pyc\n'}
+[0.720398] (hoverboard_node) StdoutLine: {'line': b'byte-compiling /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_driver/test_rs485.py to test_rs485.cpython-310.pyc\n'}
+[0.721285] (hoverboard_node) StdoutLine: {'line': b'byte-compiling /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_driver/__init__.py to __init__.cpython-310.pyc\n'}
+[0.721343] (hoverboard_node) StdoutLine: {'line': b'running install_data\n'}
+[0.721397] (hoverboard_node) StdoutLine: {'line': b'creating /workspace/hoverboard_node/install/hoverboard_node/share/ament_index\n'}
+[0.721456] (hoverboard_node) StdoutLine: {'line': b'creating /workspace/hoverboard_node/install/hoverboard_node/share/ament_index/resource_index\n'}
+[0.721497] (hoverboard_node) StdoutLine: {'line': b'creating /workspace/hoverboard_node/install/hoverboard_node/share/ament_index/resource_index/packages\n'}
+[0.721560] (hoverboard_node) StdoutLine: {'line': b'copying resource/hoverboard_node -> /workspace/hoverboard_node/install/hoverboard_node/share/ament_index/resource_index/packages\n'}
+[0.721600] (hoverboard_node) StdoutLine: {'line': b'copying package.xml -> /workspace/hoverboard_node/install/hoverboard_node/share/hoverboard_node\n'}
+[0.721661] (hoverboard_node) StdoutLine: {'line': b'creating /workspace/hoverboard_node/install/hoverboard_node/share/hoverboard_node/launch\n'}
+[0.721704] (hoverboard_node) StdoutLine: {'line': b'copying hoverboard_node/launch/hoverboard_driver.launch.py -> /workspace/hoverboard_node/install/hoverboard_node/share/hoverboard_node/launch\n'}
+[0.721758] (hoverboard_node) StdoutLine: {'line': b'running install_egg_info\n'}
+[0.723086] (hoverboard_node) StdoutLine: {'line': b'Copying build/hoverboard_node/hoverboard_node.egg-info to /workspace/hoverboard_node/install/hoverboard_node/lib/python3.10/site-packages/hoverboard_node-0.0.1-py3.10.egg-info\n'}
+[0.723989] (hoverboard_node) StdoutLine: {'line': b'running install_scripts\n'}
+[0.745608] (hoverboard_node) StdoutLine: {'line': b'Installing hoverboard_driver script to /workspace/hoverboard_node/install/hoverboard_node/lib/hoverboard_node\n'}
+[0.745978] (hoverboard_node) StdoutLine: {'line': b'Installing manual_wheel_control script to /workspace/hoverboard_node/install/hoverboard_node/lib/hoverboard_node\n'}
+[0.746036] (hoverboard_node) StdoutLine: {'line': b'Installing test_rs485 script to /workspace/hoverboard_node/install/hoverboard_node/lib/hoverboard_node\n'}
+[0.746163] (hoverboard_node) StdoutLine: {'line': b"writing list of installed files to '/workspace/hoverboard_node/build/hoverboard_node/install.log'\n"}
+[0.772637] (hoverboard_node) CommandEnded: {'returncode': 0}
+[0.784289] (hoverboard_node) JobEnded: {'identifier': 'hoverboard_node', 'rc': 0}
+[0.784744] (-) EventReactorShutdown: {}

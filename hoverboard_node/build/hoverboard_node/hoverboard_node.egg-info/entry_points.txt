@@ -1,0 +1,5 @@
+[console_scripts]
+hoverboard_driver = hoverboard_driver.hoverboard_driver:main
+manual_wheel_control = hoverboard_driver.manual_wheel_control:main
+test_rs485 = hoverboard_driver.test_rs485:main
+

@@ -1,0 +1,5 @@
+# Hoverboard front device (serial: 0001)
+SUBSYSTEM=="tty", ATTRS{serial}=="0001", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="hoverboard_front"
+
+# Hoverboard rear device (serial: 0002)
+SUBSYSTEM=="tty", ATTRS{serial}=="0002", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="hoverboard_rear"
