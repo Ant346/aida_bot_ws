@@ -1,6 +1,6 @@
 FROM ros:humble
 
-# Install system dependencies including zsh
+# Install system dependencies including zsh and development tools
 RUN apt-get update && apt-get install -y \
     build-essential \
     git \
@@ -8,11 +8,15 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-serial \
     python3-numpy \
+    python3-colcon-common-extensions \
     vim \
     nano \
     tmux \
     zsh \
     curl \
+    wget \
+    htop \
+    tree \
     && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory
@@ -26,13 +30,27 @@ RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master
     ZSH_CUSTOM=${ZSH_CUSTOM:-/root/.oh-my-zsh/custom} && \
     git clone https://github.com/zsh-users/zsh-autosuggestions.git $ZSH_CUSTOM/plugins/zsh-autosuggestions && \
     git clone https://github.com/zsh-users/zsh-syntax-highlighting.git $ZSH_CUSTOM/plugins/zsh-syntax-highlighting && \
-    sed -i 's/plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/' /root/.zshrc
+    git clone https://github.com/zsh-users/zsh-completions.git $ZSH_CUSTOM/plugins/zsh-completions && \
+    sed -i 's/plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-completions)/' /root/.zshrc
 
 # Install Python dependencies
 RUN pip3 install --no-cache-dir \
     numpy \
     pyserial \
-    matplotlib
+    matplotlib \
+    ipython \
+    jupyter
+
+# Create a better zsh configuration
+RUN echo 'export PATH="/opt/ros/humble/bin:$PATH"' >> /root/.zshrc && \
+    echo 'export LD_LIBRARY_PATH="/opt/ros/humble/lib:$LD_LIBRARY_PATH"' >> /root/.zshrc && \
+    echo 'export PYTHONPATH="/opt/ros/humble/lib/python3/dist-packages:$PYTHONPATH"' >> /root/.zshrc && \
+    echo 'export CMAKE_PREFIX_PATH="/opt/ros/humble:$CMAKE_PREFIX_PATH"' >> /root/.zshrc && \
+    echo 'alias ll="ls -la"' >> /root/.zshrc && \
+    echo 'alias build="colcon build --symlink-install"' >> /root/.zshrc && \
+    echo 'alias build-pkg="colcon build --packages-select"' >> /root/.zshrc && \
+    echo 'alias source-ws="source install/setup.zsh"' >> /root/.zshrc && \
+    echo 'alias clean="colcon clean"' >> /root/.zshrc
 
 # Source ROS2 in zsh profile
 RUN echo "source /opt/ros/humble/setup.zsh" >> /root/.zshrc && \
@@ -48,6 +66,20 @@ RUN chmod +x /entrypoint.bash
 # Copy ROS2 session script
 COPY start_ros2_session.sh /usr/local/bin/start_ros2_session.sh
 RUN chmod +x /usr/local/bin/start_ros2_session.sh
+
+# Create a development helper script
+RUN echo '#!/bin/bash' > /usr/local/bin/dev-setup && \
+    echo 'echo "🔨 Setting up development environment..."' >> /usr/local/bin/dev-setup && \
+    echo 'cd /workspace' >> /usr/local/bin/dev-setup && \
+    echo 'if [ ! -f "install/setup.zsh" ]; then' >> /usr/local/bin/dev-setup && \
+    echo '    echo "Building workspace..."' >> /usr/local/bin/dev-setup && \
+    echo '    colcon build --symlink-install' >> /usr/local/bin/dev-setup && \
+    echo '    echo "✅ Workspace built successfully!"' >> /usr/local/bin/dev-setup && \
+    echo 'fi' >> /usr/local/bin/dev-setup && \
+    echo 'source install/setup.zsh' >> /usr/local/bin/dev-setup && \
+    echo 'echo "🎯 Development environment ready!"' >> /usr/local/bin/dev-setup && \
+    echo 'exec zsh' >> /usr/local/bin/dev-setup && \
+    chmod +x /usr/local/bin/dev-setup
 
 # Set default command to zsh
 CMD ["/bin/zsh"]
