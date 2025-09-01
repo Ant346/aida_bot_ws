@@ -1,0 +1,6 @@
+[submodule "ds4_driver_submodule"]
+	path = ds4_driver_submodule
+	url = https://github.com/naoki-mizuno/ds4_driver.git
+[submodule "academic_immersion"]
+	path = academic_immersion
+	url = https://github.com/Ant346/Academic_Immersion_Skoltech.git
