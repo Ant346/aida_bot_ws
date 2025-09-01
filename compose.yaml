@@ -1,8 +1,8 @@
 services:
   ds4driver:
     build:
-      context: ./hoverboard_node
-      dockerfile: dockerfile
+      context: ./ds4_driver_submodule/docker
+      dockerfile: Dockerfile
     volumes:
       - ./ds4_driver_submodule:/workspace/ds4_driver_submodule
       - /dev:/dev
