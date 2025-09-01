@@ -17,6 +17,11 @@ RUN apt-get update && apt-get install -y \
     wget \
     htop \
     tree \
+    # DS4 Driver dependencies
+    udev \
+    joystick \
+    python3-evdev \
+    python3-psutil \
     && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory
@@ -39,7 +44,10 @@ RUN pip3 install --no-cache-dir \
     pyserial \
     matplotlib \
     ipython \
-    jupyter
+    jupyter \
+    # DS4 Driver Python dependencies
+    evdev \
+    psutil
 
 # Create a better zsh configuration
 RUN echo 'export PATH="/opt/ros/humble/bin:$PATH"' >> /root/.zshrc && \
@@ -50,7 +58,10 @@ RUN echo 'export PATH="/opt/ros/humble/bin:$PATH"' >> /root/.zshrc && \
     echo 'alias build="colcon build --symlink-install"' >> /root/.zshrc && \
     echo 'alias build-pkg="colcon build --packages-select"' >> /root/.zshrc && \
     echo 'alias source-ws="source install/setup.zsh"' >> /root/.zshrc && \
-    echo 'alias clean="colcon clean"' >> /root/.zshrc
+    echo 'alias clean="colcon clean"' >> /root/.zshrc && \
+    echo 'alias build-ds4="colcon build --packages-select ds4_driver_msgs ds4_driver --symlink-install"' >> /root/.zshrc && \
+    echo 'alias test-ds4="ros2 launch ds4_driver ds4_twist.launch.xml"' >> /root/.zshrc && \
+    echo 'alias ds4-status="ls -la /dev/input/js* && ls -la /dev/input/event*"' >> /root/.zshrc
 
 # Source ROS2 in zsh profile
 RUN echo "source /opt/ros/humble/setup.zsh" >> /root/.zshrc && \
@@ -80,6 +91,19 @@ RUN echo '#!/bin/bash' > /usr/local/bin/dev-setup && \
     echo 'echo "🎯 Development environment ready!"' >> /usr/local/bin/dev-setup && \
     echo 'exec zsh' >> /usr/local/bin/dev-setup && \
     chmod +x /usr/local/bin/dev-setup
+
+# Create DS4 driver helper script
+RUN echo '#!/bin/bash' > /usr/local/bin/ds4-setup && \
+    echo 'echo "🎮 Setting up DS4 Driver..."' >> /usr/local/bin/ds4-setup && \
+    echo 'cd /workspace' >> /usr/local/bin/ds4-setup && \
+    echo 'echo "Building DS4 driver packages..."' >> /usr/local/bin/ds4-setup && \
+    echo 'colcon build --packages-select ds4_driver_msgs ds4_driver --symlink-install' >> /usr/local/bin/ds4-setup && \
+    echo 'source install/setup.zsh' >> /usr/local/bin/ds4-setup && \
+    echo 'echo "🎮 DS4 Driver ready!"' >> /usr/local/bin/ds4-setup && \
+    echo 'echo "Available commands:"' >> /usr/local/bin/ds4-setup && \
+    echo 'echo "  test-ds4: Launch DS4 twist controller"' >> /usr/local/bin/ds4-setup && \
+    echo 'echo "  ds4-status: Check joystick devices"' >> /usr/local/bin/ds4-setup && \
+    chmod +x /usr/local/bin/ds4-setup
 
 # Set default command to zsh
 CMD ["/bin/zsh"]

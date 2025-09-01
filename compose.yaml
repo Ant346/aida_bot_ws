@@ -1,10 +1,10 @@
 services:
   ds4driver:
     build:
-      context: ./ds4_driver/docker
-      dockerfile: Dockerfile
+      context: ./hoverboard_node
+      dockerfile: dockerfile
     volumes:
-      - ./ds4_driver:/workspace/ds4_driver
+      - ./ds4_driver_submodule:/workspace/ds4_driver_submodule
       - /dev:/dev
     environment:
       - ROS_DISTRO=humble
@@ -18,6 +18,22 @@ services:
       dockerfile: dockerfile
     volumes:
       - ./hoverboard_node:/workspace/hoverboard_node
+      - ./ds4_driver_submodule:/workspace/ds4_driver_submodule
+      - /dev:/dev
+    environment:
+      - ROS_DISTRO=humble
+    entrypoint: ["/entrypoint.bash"]
+    command: ["/bin/zsh"]
+    privileged: true
+    stdin_open: true
+    tty: true
+
+  ds4_driver_dev:
+    build:
+      context: ./hoverboard_node
+      dockerfile: dockerfile
+    volumes:
+      - ./ds4_driver_submodule:/workspace/ds4_driver_submodule
       - /dev:/dev
     environment:
       - ROS_DISTRO=humble
