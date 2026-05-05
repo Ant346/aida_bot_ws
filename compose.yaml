@@ -34,7 +34,14 @@ services:
       ROS_DOMAIN_ID: "0"
       COLCON_PACKAGES_SELECT: "odroid_node"
     entrypoint: ["/entrypoint.bash"]
-    command: ["ros2", "launch", "odroid_node", "odroid_driver.launch.py"]
+    # CH341 serial "hoverboard" boards: set simulation_mode:=false and match front_serial/rear_serial
+    # in src/odroid_node/config/odroid_driver.yaml (or /dev/serial/by-id). CAN2USB rigs have no CH341 — keep sim on.
+    command:
+      - ros2
+      - launch
+      - odroid_node
+      - odroid_driver.launch.py
+      - simulation_mode:=true
     privileged: true
     network_mode: host
     depends_on:
