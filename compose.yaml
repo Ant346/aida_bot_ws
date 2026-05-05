@@ -10,8 +10,10 @@ services:
       - ./install:/workspace/install
       - /dev:/dev
     environment:
-      - ROS_DISTRO=humble
-      - ROS_DOMAIN_ID=0
+      ROS_DISTRO: humble
+      ROS_DOMAIN_ID: "0"
+      # Do not pull realsense2_camera into this service (slow / large); build only DS4.
+      COLCON_PACKAGES_SELECT: "ds4_driver_msgs ds4_driver"
     entrypoint: ["/entrypoint.bash"]
     command: ["ros2", "launch", "ds4_driver", "ds4_twist.launch.xml"]
     privileged: true
@@ -28,8 +30,9 @@ services:
       - ./install:/workspace/install
       - /dev:/dev
     environment:
-      - ROS_DISTRO=humble
-      - ROS_DOMAIN_ID=0
+      ROS_DISTRO: humble
+      ROS_DOMAIN_ID: "0"
+      COLCON_PACKAGES_SELECT: "odroid_node"
     entrypoint: ["/entrypoint.bash"]
     command: ["ros2", "launch", "odroid_node", "odroid_driver.launch.py"]
     privileged: true
@@ -55,6 +58,8 @@ services:
     environment:
       - ROS_DISTRO=humble
       - ROS_DOMAIN_ID=0
+      # Limit parallel compile/link jobs to reduce stalls / OOM on RealSense C++ build.
+      - COLCON_PARALLEL_WORKERS=2
       # Значение ниже можно оставить :0 или из echo $DISPLAY; entrypoint переопределит по socket + .Xauthority.
       - DISPLAY=${DISPLAY:-:0}
       # Writable merge of host /root/.Xauthority; same path for PID1 and docker compose exec.

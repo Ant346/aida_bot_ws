@@ -61,8 +61,19 @@ build_workspace() {
     if [[ -d "src" ]] && [[ -n "$(ls -A src/ 2>/dev/null)" ]]; then
         rosdep install --from-paths src --ignore-src -r -y --skip-keys=librealsense2 2>/dev/null || true
     fi
+    local -a COLCON_OPTS=()
+    if [[ -n "${COLCON_PACKAGES_SELECT:-}" ]]; then
+        # Space-separated leaf packages (Compose). Skips unrelated heavy builds (realsense2_camera).
+        read -r -a _COLCON_PKGS <<< "${COLCON_PACKAGES_SELECT}"
+        COLCON_OPTS+=(--packages-select "${_COLCON_PKGS[@]}")
+        echo "colcon: COLCON_PACKAGES_SELECT → ${COLCON_PACKAGES_SELECT}"
+    fi
+    if [[ -n "${COLCON_PARALLEL_WORKERS:-}" ]]; then
+        COLCON_OPTS+=(--executor parallel --parallel-workers "${COLCON_PARALLEL_WORKERS}")
+        echo "colcon: parallel-workers=${COLCON_PARALLEL_WORKERS}"
+    fi
     # One invocation: colcon orders packages by dependency (msgs before nodes).
-    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release \
+    colcon build --symlink-install "${COLCON_OPTS[@]}" --cmake-args -DCMAKE_BUILD_TYPE=Release \
         --event-handlers console_direct+
 }
 
@@ -90,8 +101,9 @@ if [[ -f /workspace/install/setup.bash ]] && [[ "$NEED_BUILD" != "true" ]]; then
     fi
 fi
 
-# Partial colcon: empty or stale install/realsense2_camera/ — directory may exist though build failed.
-if [[ -f /workspace/install/setup.bash ]] && [[ "$NEED_BUILD" != "true" ]]; then
+# Only when building the full workspace: ensure realsense2_camera actually installed.
+if [[ -f /workspace/install/setup.bash ]] && [[ "$NEED_BUILD" != "true" ]] \
+    && [[ -z "${COLCON_PACKAGES_SELECT:-}" ]]; then
     rs_src_pkg="/workspace/src/realsense-ros/realsense2_camera/package.xml"
     rs_inst_pkg="/workspace/install/realsense2_camera/share/realsense2_camera/package.xml"
     if [[ -f "$rs_src_pkg" ]] && [[ ! -f "$rs_inst_pkg" ]]; then
