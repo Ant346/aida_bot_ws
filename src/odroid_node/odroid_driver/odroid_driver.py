@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Single Odroid host node: cmd_vel → mecanum wheel controllers (hoverboard-style serial protocol)."""
+"""cmd_vel → mecanum wheels: UART (hoverboard framing) or SocketCAN (ODrive native protocol)."""
+
 import glob
 import os
 import struct
@@ -13,113 +14,179 @@ from geometry_msgs.msg import Twist, TwistStamped
 from rclpy.node import Node
 from std_srvs.srv import Empty
 
+# ODrive CAN: (axis_id << 5) | cmd — см. odroid_v_3.6/main.py
+_CAN_SET_AXIS_STATE = 0x007
+_CAN_SET_INPUT_VEL = 0x00D
+_AXIS_IDLE = 1
+_AXIS_CLOSED_LOOP_CONTROL = 8
+
+TAU = 2.0 * np.pi
+
 
 class OdroidDriver(Node):
-    """Subscribes to cmd_vel, talks to front/rear motor boards over USB–serial (e.g. CH341)."""
+    """transport=uart_hoverboard (CH341) или socketcan_odrive на `can0` / `can1`."""
 
     def __init__(self):
         super().__init__('odroid_driver')
 
-        self.get_logger().info('Initializing odroid driver (wheel controllers + kinematics)...')
+        self.get_logger().info('Initializing odroid driver')
 
         self.declare_parameters(
             '',
             [
-                ('front_serial', '0001'),
-                ('rear_serial', '0002'),
-                ('baudrate', 115200),
-                ('timeout', 0.05),
+                ('transport', 'uart_hoverboard'),  # socketcan_odrive | uart_hoverboard
+                ('simulation_mode', False),
+                ('cmd_vel_subscribe_stamped', False),
+                ('angular_z_scale', 2.0),
+                ('wheel_odometry_topic', 'wheel_odometry'),
                 ('wheel_radius', 0.095),
                 ('wheel_base', 0.635),
                 ('wheel_track', 0.72),
                 ('max_speed', 50),
                 ('test_speed', 0),
-                ('simulation_mode', False),
-                ('cmd_vel_subscribe_stamped', False),
-                ('angular_z_scale', 2.0),
-                ('wheel_odometry_topic', 'wheel_odometry'),
+                ('front_serial', '0001'),
+                ('rear_serial', '0002'),
+                ('baudrate', 115200),
+                ('timeout', 0.05),
+                # SocketCAN (интерфейс после slcand + ip link, обычно can0/can1)
+                ('can_interface', 'can0'),
+                ('can_bitrate', 250000),
+                ('axis_id_fl', 0),
+                ('axis_id_fr', -1),
+                ('axis_id_rl', -1),
+                ('axis_id_rr', -1),
+                ('can_invert_rl', True),
+                ('can_invert_rr', True),
+                ('torque_ff', 0.0),
             ],
         )
 
+        self.front_port = None
+        self.rear_port = None
+        self.front_buffer = bytearray()
+        self.rear_buffer = bytearray()
+        self._transport_kind = 'none'  # none | uart | can
+        self._can_bus = None
+        self._can_imported = None
+
         self._init_boards()
 
-        stamped = self.get_parameter('cmd_vel_subscribe_stamped').value
-        if stamped:
+        if self.get_parameter('cmd_vel_subscribe_stamped').value:
             self.create_subscription(
-                TwistStamped, 'cmd_vel', self._cmd_vel_stamped_callback, 10)
-            self.get_logger().info('cmd_vel subscription: TwistStamped')
+                TwistStamped, 'cmd_vel', self._cmd_vel_stamped_cb, 10)
+            self.get_logger().info('cmd_vel: TwistStamped')
         else:
             self.create_subscription(Twist, 'cmd_vel', self.cmd_vel_callback, 10)
-            self.get_logger().info('cmd_vel subscription: Twist')
+            self.get_logger().info('cmd_vel: Twist')
 
-        odom_topic = self.get_parameter('wheel_odometry_topic').value
-        self.odom_pub = self.create_publisher(Twist, odom_topic, 10)
-        self.get_logger().info(f'Publishing wheel odometry (Twist) on "{odom_topic}"')
+        otopic = self.get_parameter('wheel_odometry_topic').value
+        self.odom_pub = self.create_publisher(Twist, otopic, 10)
 
         self.create_service(Empty, 'test_wheel', self.test_wheel_callback)
 
-        self.running = True
-        self.front_thread = threading.Thread(target=self._front_communication_loop, daemon=True)
-        self.front_thread.start()
+        sim = bool(self.get_parameter('simulation_mode').value)
 
-        if getattr(self, 'rear_port', None) is not None:
-            self.rear_thread = threading.Thread(target=self._rear_communication_loop, daemon=True)
+        self.running = True
+        self.front_thread = None
+        self.rear_thread = None
+
+        if sim:
+            self.front_thread = threading.Thread(
+                target=self._front_communication_loop, daemon=True)
+        elif self._transport_kind == 'can':
+            self.front_thread = threading.Thread(
+                target=self._can_communication_loop, daemon=True)
+        elif self._transport_kind == 'uart':
+            self.front_thread = threading.Thread(
+                target=self._front_communication_loop, daemon=True)
+            if self.rear_port is not None:
+                self.rear_thread = threading.Thread(
+                    target=self._rear_communication_loop, daemon=True)
+        elif self._transport_kind == 'none':
+            self.front_thread = threading.Thread(
+                target=self._front_communication_loop, daemon=True)
+
+        if self.front_thread is not None:
+            self.front_thread.start()
+        if self.rear_thread is not None:
             self.rear_thread.start()
-            self.get_logger().info('Rear board communication thread started')
-        else:
-            self.rear_thread = None
-            self.get_logger().info('Rear board not available — front only')
 
         self.create_timer(0.1, self._publish_odometry)
-        self.get_logger().info('odroid_driver ready')
+        mode = ('simulation' if sim else self._transport_kind)
+        self.get_logger().info(f'odroid_driver ready (mode={mode})')
 
-    def _find_ch341_device(self, device_id):
-        try:
-            devices = glob.glob('/dev/serial/by-id/*')
-            for device in devices:
-                if device_id in device:
-                    return device
-            if os.path.exists('/dev/ttyCH341USB0'):
-                return '/dev/ttyCH341USB0'
-            if os.path.exists('/dev/ttyCH341USB1'):
-                return '/dev/ttyCH341USB1'
-            self.get_logger().error('No CH341 / by-id device matched')
-            return None
-        except Exception as e:
-            self.get_logger().error(f'Error finding serial device: {e!s}')
-            return None
+    def _can_mod(self):
+        if self._can_imported is None:
+            try:
+                import can as can_mod
 
-    def _check_device_status(self, port):
-        try:
-            if not port.is_open:
-                self.get_logger().error(f'Port {port.port} is not open')
-                return False
-            port.write(b'\xE8\x00\x00\x00')
-            time.sleep(0.01)
-            if port.in_waiting:
-                status = port.read(port.in_waiting)
-                self.get_logger().info(f'Device status: {status.hex()}')
-                return True
-            return False
-        except Exception as e:
-            self.get_logger().error(f'Error checking device status: {e!s}')
-            return False
+                self._can_imported = can_mod
+            except ImportError as e:
+                raise RuntimeError(
+                    'Нужен python3-can для transport socketcan_odrive') from e
+        return self._can_imported
+
+    def _norm_transport(self):
+        t = str(self.get_parameter('transport').value).replace('-', '_').lower()
+        if t in ('uart_hoverboard', 'serial', 'uart'):
+            return 'uart'
+        if t in ('socketcan_odrive', 'can_odrive', 'odrive_can', 'socketcan'):
+            return 'can'
+        self.get_logger().warning(f'transport={t} — считаем uart_hoverboard')
+        return 'uart'
 
     def _init_boards(self):
-        simulation_mode = self.get_parameter('simulation_mode').value
-        if simulation_mode:
-            self.get_logger().info('SIMULATION_MODE — no serial hardware')
-            self.front_port = None
-            self.rear_port = None
-            self.front_buffer = bytearray()
-            self.rear_buffer = bytearray()
-            self._init_kinematics_state()
+        self._transport_kind = 'none'
+        sim = bool(self.get_parameter('simulation_mode').value)
+
+        if sim:
+            self.get_logger().info('SIMULATION_MODE')
+            self._init_kinematic_params()
             return
 
+        t = self._norm_transport()
+
+        if t == 'can':
+            can_mod = self._can_mod()
+            iface = self.get_parameter('can_interface').get_parameter_value().string_value.strip()
+            if not iface:
+                iface = 'can0'
+            rate = int(self.get_parameter('can_bitrate').value)
+            try:
+                self._can_bus = can_mod.interface.Bus(
+                    bustype='socketcan', channel=iface, bitrate=rate)
+            except Exception as e:
+                raise RuntimeError(
+                    f'Не удалось открыть SocketCAN `{iface}` '
+                    '(проверь: sudo odroid_v_3.6/start_can.sh → can0/can1): '
+                    f'{e}',
+                ) from e
+
+            self._transport_kind = 'can'
+            self.get_logger().info(f'SocketCAN `{iface}`, bitrate={rate}')
+
+            aids = tuple(
+                int(self.get_parameter(n).value)
+                for n in ('axis_id_fl', 'axis_id_fr', 'axis_id_rl', 'axis_id_rr'))
+            started = False
+            for aid in aids:
+                if aid < 0:
+                    continue
+                self._can_set_axis_state(aid, _AXIS_CLOSED_LOOP_CONTROL)
+                started = True
+            if started:
+                time.sleep(0.35)
+
+            self._init_kinematic_params()
+            self.get_logger().info(f'CAN axis ids FL FR RL RR = {aids}')
+            return
+
+        # UART
         front_path = self._find_ch341_device(self.get_parameter('front_serial').value)
         if not front_path:
             raise serial.SerialException(
-                'Front board: no serial device (set front_serial or simulation_mode)')
+                'Нет UART (transport uart_hoverboard). '
+                'Для CAN → transport:=socketcan_odrive, см. YAML')
 
         self.front_port = serial.Serial(
             front_path,
@@ -133,12 +200,10 @@ class OdroidDriver(Node):
             dsrdtr=False,
         )
         self.front_buffer = bytearray()
-        self.get_logger().info(f'Front board on {self.front_port.port}')
-        if not self._check_device_status(self.front_port):
-            self.get_logger().error('Front device not responding to status poll')
+        self._check_device_status(self.front_port)
 
-        rear_path = self._find_ch341_device(self.get_parameter('rear_serial').value)
         self.rear_port = None
+        rear_path = self._find_ch341_device(self.get_parameter('rear_serial').value)
         if rear_path:
             try:
                 self.rear_port = serial.Serial(
@@ -153,241 +218,313 @@ class OdroidDriver(Node):
                     dsrdtr=False,
                 )
                 self.rear_buffer = bytearray()
-                self.get_logger().info(f'Rear board on {self.rear_port.port}')
-                if not self._check_device_status(self.rear_port):
-                    self.get_logger().error('Rear device not responding — disabling rear')
-                    self.rear_port.close()
-                    self.rear_port = None
             except Exception as e:
-                self.get_logger().error(f'Rear init failed: {e!s}')
-                self.rear_port = None
-        else:
-            self.get_logger().info('Rear board not found — front only')
+                self.get_logger().warning(f'UART rear недоступен: {e!s}')
 
-        self._init_kinematics_state()
+        self._transport_kind = 'uart'
+        self._init_kinematic_params()
 
-    def _init_kinematics_state(self):
-        self.R = self.get_parameter('wheel_radius').value
-        self.L = self.get_parameter('wheel_base').value / 2.0
-        self.W = self.get_parameter('wheel_track').value / 2.0
-        self.max_speed = self.get_parameter('max_speed').value
+    def _init_kinematic_params(self):
+        self.R = float(self.get_parameter('wheel_radius').value)
+        self.L = float(self.get_parameter('wheel_base').value) / 2.0
+        self.W = float(self.get_parameter('wheel_track').value) / 2.0
+        self.max_speed = float(self.get_parameter('max_speed').value)
         self.lock = threading.Lock()
         self.target_vel = np.zeros(3)
-        self.last_feedback = {
-            'front': {'speedL': 0, 'speedR': 0},
-            'rear': {'speedL': 0, 'speedR': 0},
-        }
 
-    def _cmd_vel_stamped_callback(self, msg: TwistStamped):
+    def _find_ch341_device(self, device_id):
+        try:
+            for device in glob.glob('/dev/serial/by-id/*'):
+                if device_id in device:
+                    return device
+            for p in ('/dev/ttyCH341USB0', '/dev/ttyCH341USB1'):
+                if os.path.exists(p):
+                    return p
+            return None
+        except Exception as e:
+            self.get_logger().error(str(e))
+            return None
+
+    def _check_device_status(self, port):
+        try:
+            if not port.is_open:
+                return
+            port.write(b'\xE8\x00\x00\x00')
+            time.sleep(0.008)
+            if port.in_waiting:
+                port.read(port.in_waiting)
+        except Exception as e:
+            self.get_logger().debug(f'Status poll: {e!s}')
+
+    def _cmd_vel_stamped_cb(self, msg):
         self.cmd_vel_callback(msg.twist)
 
     def cmd_vel_callback(self, msg: Twist):
-        az_scale = float(self.get_parameter('angular_z_scale').value)
+        k = float(self.get_parameter('angular_z_scale').value)
         with self.lock:
-            self.target_vel = np.array([msg.linear.x, msg.linear.y, msg.angular.z * az_scale])
+            self.target_vel[:] = msg.linear.x, msg.linear.y, msg.angular.z * k
 
-    def _inverse_kinematics(self, vx, vy, wz):
-        fl = (vx - vy + (self.L + self.W) * wz) / self.R
-        fr = (vx + vy - (self.L + self.W) * wz) / self.R
-        rl = (vx + vy + (self.L + self.W) * wz) / self.R
-        rr = (vx - vy - (self.L + self.W) * wz) / self.R
+    def _wheel_omega_rad_s(self, vx, vy, wz):
+        r = max(self.R, 1e-6)
+        lw = self.L + self.W
+        fl = (vx - vy + lw * wz) / r
+        fr = (vx + vy - lw * wz) / r
+        rl = (vx + vy + lw * wz) / r
+        rr = (vx - vy - lw * wz) / r
+        return fl, fr, rl, rr
 
-        if abs(vy) < 0.01 and abs(wz) < 0.01:
-            self.get_logger().debug(
-                f'STRAIGHT vx={vx:.2f} fl={fl:.2f} fr={fr:.2f} rl={rl:.2f} rr={rr:.2f}')
-
-        scale = 1000.0 / self.max_speed
-        fl = int(fl * scale)
-        fr = int(fr * scale)
-        rl = int(rl * scale)
-        rr = int(rr * scale)
-
-        lim = lambda v: max(-1000, min(1000, v))
+    def _inverse_kinematic_uart_scaled(self, vx, vy, wz):
+        fl, fr, rl, rr = self._wheel_omega_rad_s(vx, vy, wz)
+        sc = 1000.0 / max(self.max_speed, 1e-6)
+        lim = lambda om: max(-1000, min(1000, int(om * sc)))
         return lim(fl), lim(fr), lim(rl), lim(rr)
 
-    def _send_board_command(self, port, left_speed, right_speed, label='board'):
+    def _can_set_axis_state(self, axis_id: int, state: int):
+        cid = (axis_id << 5) | _CAN_SET_AXIS_STATE
+        data = int(state).to_bytes(4, 'little')
+        msg = self._can_mod().Message(arbitration_id=cid, data=data, is_extended_id=False)
         try:
-            if self.get_parameter('simulation_mode').value:
-                self.get_logger().debug(f'SIM {label}: L={left_speed} R={right_speed}')
+            self._can_bus.send(msg)
+        except Exception as e:
+            self.get_logger().error(f'CAN set_state axis={axis_id}: {e!s}')
+
+    def _can_send_vel_turns(self, axis_id: int, turns_s: float, tq: float):
+        if axis_id < 0:
+            return
+        cid = (axis_id << 5) | _CAN_SET_INPUT_VEL
+        data = struct.pack('<ff', float(turns_s), float(tq))
+        msg = self._can_mod().Message(arbitration_id=cid, data=data, is_extended_id=False)
+        try:
+            self._can_bus.send(msg)
+        except Exception as e:
+            self.get_logger().error(f'CAN velocity axis={axis_id}: {e!s}')
+
+    def _can_communication_loop(self):
+        tq = float(self.get_parameter('torque_ff').value)
+        aids = [
+            int(self.get_parameter(k).value)
+            for k in ('axis_id_fl', 'axis_id_fr', 'axis_id_rl', 'axis_id_rr')
+        ]
+        inv_r = -1.0 if bool(self.get_parameter('can_invert_rl').value) else 1.0
+        inv_rr = -1.0 if bool(self.get_parameter('can_invert_rr').value) else 1.0
+
+        while self.running and rclpy.ok():
+            try:
+                with self.lock:
+                    vx, vy, wz = self.target_vel.tolist()
+
+                fl_r, fr_r, rl_r, rr_r = self._wheel_omega_rad_s(vx, vy, wz)
+                fl_t = fl_r / TAU
+                fr_t = fr_r / TAU
+                rl_t = rl_r * inv_r / TAU
+                rr_t = rr_r * inv_rr / TAU
+
+                spins = [fl_t, fr_t, rl_t, rr_t]
+
+                self.get_logger().debug(
+                    f'CAN vx vy wz {(vx, vy, wz)} turns/s {spins}')
+
+                for aid, tsp in zip(aids, spins):
+                    self._can_send_vel_turns(aid, tsp, tq)
+
+                time.sleep(0.02)
+            except Exception as e:
+                self.get_logger().error(f'CAN loop: {e!s}')
+                time.sleep(1.0)
+
+    def _send_board_command(self, port, left_speed, right_speed, label=''):
+        try:
+            if bool(self.get_parameter('simulation_mode').value):
+                return
+            if port is None:
                 return
 
-            left_speed = max(-32768, min(32767, left_speed))
-            right_speed = max(-32768, min(32767, right_speed))
-            self.get_logger().debug(f'{label}: command L={left_speed} R={right_speed}')
+            ls = max(-32768, min(32767, left_speed))
+            rs = max(-32768, min(32767, right_speed))
 
-            start_frame = 0xABCD
-            checksum = (start_frame & 0xFFFF) ^ (left_speed & 0xFFFF) ^ (right_speed & 0xFFFF)
-            command = struct.pack('<HhhH', start_frame, left_speed, right_speed, checksum)
+            chk = (
+                (0xABCD ^ (ls & 0xFFFF) ^ (rs & 0xFFFF)) & 0xFFFF
+            )
+            buf = struct.pack('<HhhH', 0xABCD, ls, rs, chk)
             port.reset_input_buffer()
             port.reset_output_buffer()
-            port.write(command)
+            port.write(buf)
             port.flush()
-        except serial.SerialException as e:
-            self.get_logger().error(f'{label} write failed: {e!s}')
-        except struct.error as e:
-            self.get_logger().error(f'{label} pack failed: {e!s}')
+            self.get_logger().debug(f'UART {label} L={ls} R={rs}')
+        except Exception as e:
+            self.get_logger().error(str(e))
 
-    def _read_board_feedback(self, port, buffer):
+    def _read_uart_feedback(self, port, buffer):
         try:
-            while port.in_waiting:
-                byte = port.read(1)
-                buffer.extend(byte)
-                if len(buffer) >= 2:
-                    if buffer[-2] == 0xCD and buffer[-1] == 0xAB:
-                        if len(buffer) >= 20:
-                            msg = buffer[-20:]
-                            feedback = self._parse_board_feedback(msg)
-                            if feedback:
-                                buffer.clear()
-                                return feedback
-        except serial.SerialException as e:
-            self.get_logger().error(f'Feedback read failed: {e!s}')
-        return None
-
-    def _parse_board_feedback(self, msg):
-        try:
-            feedback = struct.unpack('<HhhhhhhH2xH', msg)
-            calculated = (
-                feedback[0] ^ feedback[1] ^ feedback[2] ^ feedback[3]
-                ^ feedback[4] ^ feedback[5] ^ feedback[6] ^ feedback[7]
-            )
-            if calculated == feedback[8]:
-                return {'speedL': feedback[3], 'speedR': feedback[4]}
-        except struct.error as e:
-            self.get_logger().error(f'Unpack feedback: {e!s}')
+            while port and port.in_waiting:
+                buffer.extend(port.read(1))
+                if len(buffer) >= 2 and buffer[-2] == 0xCD and buffer[-1] == 0xAB:
+                    if len(buffer) >= 20:
+                        m = bytes(buffer[-20:])
+                        fb = struct.unpack('<HhhhhhhH2xH', m)
+                        c = fb[0] ^ fb[1] ^ fb[2] ^ fb[3] ^ fb[4] ^ fb[5] ^ fb[6] ^ fb[7]
+                        buffer.clear()
+                        if c == fb[8]:
+                            return {'speedL': fb[3], 'speedR': fb[4]}
+        except Exception as e:
+            self.get_logger().error(str(e))
         return None
 
     def _front_communication_loop(self):
+        sim = bool(self.get_parameter('simulation_mode').value)
         while self.running and rclpy.ok():
             try:
                 with self.lock:
-                    vx, vy, wz = self.target_vel
-                    fl, fr, rl, rr = self._inverse_kinematics(vx, vy, wz)
+                    vx, vy, wz = self.target_vel.tolist()
+                fi, fj, fk, fm = self._inverse_kinematic_uart_scaled(vx, vy, wz)
 
-                self.get_logger().debug(
-                    f'cmd vx={vx:.2f} vy={vy:.2f} wz={wz:.2f} | FL={fl} FR={fr} RL={rl} RR={rr}')
+                self._send_board_command(self.front_port, fi, fj, 'F')
 
-                self._send_board_command(self.front_port, fl, fr, 'FRONT')
-
-                if self.get_parameter('simulation_mode').value:
-                    with self.lock:
-                        self.last_feedback['front'] = {'speedL': fl, 'speedR': fr}
-                elif self.front_port is not None:
-                    feedback = self._read_board_feedback(self.front_port, self.front_buffer)
-                    if feedback:
-                        with self.lock:
-                            self.last_feedback['front'] = feedback
+                if not sim and self.front_port is not None:
+                    self._read_uart_feedback(self.front_port, self.front_buffer)
 
                 time.sleep(0.01)
             except Exception as e:
-                self.get_logger().error(f'Front loop error: {e!s}')
-                time.sleep(1.0)
+                self.get_logger().error(f'UART front loop: {e!s}')
+                time.sleep(0.8)
 
     def _rear_communication_loop(self):
+        sim = bool(self.get_parameter('simulation_mode').value)
         while self.running and rclpy.ok():
             try:
                 with self.lock:
-                    vx, vy, wz = self.target_vel
-                    fl, fr, rl, rr = self._inverse_kinematics(vx, vy, wz)
-
-                self.get_logger().debug(f'REAR cmd RL={-rl} RR={-rr}')
-                self._send_board_command(self.rear_port, -rl, -rr, 'REAR')
-
-                if self.get_parameter('simulation_mode').value:
-                    with self.lock:
-                        self.last_feedback['rear'] = {'speedL': -rl, 'speedR': -rr}
-                elif self.rear_port is not None:
-                    feedback = self._read_board_feedback(self.rear_port, self.rear_buffer)
-                    if feedback:
-                        with self.lock:
-                            self.last_feedback['rear'] = {
-                                'speedL': -feedback['speedL'],
-                                'speedR': -feedback['speedR'],
-                            }
-
+                    vx, vy, wz = self.target_vel.tolist()
+                fi, fj, fk, fm = self._inverse_kinematic_uart_scaled(vx, vy, wz)
+                self._send_board_command(self.rear_port, -fk, -fm, 'R')
+                if not sim and self.rear_port:
+                    self._read_uart_feedback(self.rear_port, self.rear_buffer)
                 time.sleep(0.01)
             except Exception as e:
-                self.get_logger().error(f'Rear loop error: {e!s}')
-                time.sleep(1.0)
+                self.get_logger().error(f'UART rear loop: {e!s}')
+                time.sleep(0.8)
 
-    def _forward_kinematics(self):
+    def _forward_kinematic_cmd_twist(self):
         with self.lock:
-            fl = self.last_feedback['front']['speedL'] * self.max_speed / 1000.0
-            fr = self.last_feedback['front']['speedR'] * self.max_speed / 1000.0
-            if self.rear_port is not None:
-                rl = -self.last_feedback['rear']['speedL'] * self.max_speed / 1000.0
-                rr = -self.last_feedback['rear']['speedR'] * self.max_speed / 1000.0
-            else:
-                rl, rr = fl, fr
+            vx_c, vy_c, wz_c = self.target_vel.tolist()
 
-        vx = (fl + fr + rl + rr) * (self.R / 4.0)
-        vy = (-fl + fr - rl + rr) * (self.R / 4.0)
-        wz = (-fl + fr + rl - rr) * (self.R / (4.0 * (self.L + self.W)))
-        return vx, vy, wz
+        fl, fr, rl, rr = self._wheel_omega_rad_s(vx_c, vy_c, wz_c)
+        r = self.R
+        lw = self.L + self.W
+        vx = r * (fl + fr + rl + rr) / 4.0
+        vy = r * (-fl + fr - rl + rr) / 4.0
+        wz = r * (-fl + fr + rl - rr) / (4.0 * lw)
+        # как в старом hoverboard узле для Twist-«одометрии»:
+        return vx, wz, vy
 
     def _publish_odometry(self):
         try:
-            vx, vy, wz = self._forward_kinematics()
-            msg = Twist()
-            msg.linear.x = vx
-            msg.linear.y = wz
-            msg.angular.z = vy
-            self.odom_pub.publish(msg)
+            lx, lz, ay = self._forward_kinematic_cmd_twist()
+            m = Twist()
+            m.linear.x = float(lx)
+            m.linear.y = float(lz)
+            m.angular.z = float(ay)
+            self.odom_pub.publish(m)
         except Exception as e:
-            self.get_logger().error(f'odometry publish: {e!s}')
+            self.get_logger().error(str(e))
 
     def test_wheel_callback(self, request, response):
-        self.get_logger().info('test_wheel service: run short spin test')
-        test_speed = int(self.get_parameter('test_speed').value)
-        if test_speed == 0:
-            self.get_logger().warning('test_speed is 0; set param test_speed non-zero')
+        self.running = False
+        if self.front_thread is not None:
+            self.front_thread.join(timeout=1.2)
+        if self.rear_thread is not None:
+            self.rear_thread.join(timeout=1.2)
+
+        sim = bool(self.get_parameter('simulation_mode').value)
+        t = self._norm_transport()
 
         try:
-            self.running = False
-            self.front_thread.join(timeout=1.0)
-            if self.rear_thread is not None:
-                self.rear_thread.join(timeout=1.0)
-
-            if not self.get_parameter('simulation_mode').value and self.front_port is not None:
-                self._send_board_command(self.front_port, 0, test_speed, 'FRONT')
-                time.sleep(5)
-                self._send_board_command(self.front_port, 0, 0, 'FRONT')
-
-                if self.rear_port is not None:
-                    self._send_board_command(self.rear_port, 0, -test_speed, 'REAR')
-                    time.sleep(5)
-                    self._send_board_command(self.rear_port, 0, 0, 'REAR')
+            if not sim and t == 'can' and self._can_bus is not None:
+                turns_s = float(self.get_parameter('test_speed').value)
+                aid0 = int(self.get_parameter('axis_id_fl').value)
+                iq = float(self.get_parameter('torque_ff').value)
+                vt = turns_s if abs(turns_s) > 1e-6 else 3.0
+                self.get_logger().info(f'test_wheel CAN FL @ {vt} turns/s')
+                if aid0 >= 0:
+                    self._can_send_vel_turns(aid0, vt, iq)
+                    time.sleep(2.0)
+                    self._can_send_vel_turns(aid0, 0.0, iq)
+                else:
+                    self.get_logger().warning('axis_id_fl < 0')
+            elif not sim and self.front_port:
+                tsp = max(
+                    80,
+                    abs(int(float(self.get_parameter('test_speed').value))))
+                self._send_board_command(self.front_port, 0, tsp, 'test')
+                time.sleep(3.0)
+                self._send_board_command(self.front_port, 0, 0, 'test')
             else:
-                self.get_logger().info('test_wheel: simulation or no front port — skip hardware pulse')
-
-            self.running = True
-            self.front_thread = threading.Thread(target=self._front_communication_loop, daemon=True)
-            self.front_thread.start()
-            if self.rear_port is not None:
-                self.rear_thread = threading.Thread(target=self._rear_communication_loop, daemon=True)
-                self.rear_thread.start()
+                self.get_logger().info('test_wheel: skip (sim or no iface)')
         except Exception as e:
-            self.get_logger().error(f'test_wheel error: {e!s}')
+            self.get_logger().error(str(e))
+        finally:
             self.running = True
-            self.front_thread = threading.Thread(target=self._front_communication_loop, daemon=True)
-            self.front_thread.start()
-            if self.rear_port is not None:
-                self.rear_thread = threading.Thread(target=self._rear_communication_loop, daemon=True)
+            sim2 = bool(self.get_parameter('simulation_mode').value)
+            self.front_thread = None
+            self.rear_thread = None
+            if sim2:
+                self.front_thread = threading.Thread(
+                    target=self._front_communication_loop, daemon=True)
+            elif self._transport_kind == 'can':
+                self.front_thread = threading.Thread(
+                    target=self._can_communication_loop, daemon=True)
+            elif self._transport_kind == 'uart':
+                self.front_thread = threading.Thread(
+                    target=self._front_communication_loop, daemon=True)
+                if self.rear_port is not None:
+                    self.rear_thread = threading.Thread(
+                        target=self._rear_communication_loop, daemon=True)
+
+            if self.front_thread:
+                self.front_thread.start()
+            if self.rear_thread:
                 self.rear_thread.start()
 
         return response
 
     def destroy_node(self):
         self.running = False
-        if self.front_thread.is_alive():
+        if self.front_thread and self.front_thread.is_alive():
             self.front_thread.join(timeout=2.0)
-        if self.rear_thread is not None and self.rear_thread.is_alive():
+        if self.rear_thread and self.rear_thread.is_alive():
             self.rear_thread.join(timeout=2.0)
-        if self.front_port is not None:
-            self.front_port.close()
-        if self.rear_port is not None:
-            self.rear_port.close()
+
+        self._shutdown_can_axes()
+
+        try:
+            if self.front_port is not None:
+                self.front_port.close()
+            if self.rear_port is not None:
+                self.rear_port.close()
+        except Exception:
+            pass
         super().destroy_node()
+
+    def _shutdown_can_axes(self):
+        if self._can_bus is None:
+            return
+
+        aids = [
+            int(self.get_parameter(k).value)
+            for k in ('axis_id_fl', 'axis_id_fr', 'axis_id_rl', 'axis_id_rr')
+        ]
+        try:
+            for aid in aids:
+                if aid < 0:
+                    continue
+                self._can_send_vel_turns(aid, 0.0, 0.0)
+                self._can_set_axis_state(aid, _AXIS_IDLE)
+        except Exception as e:
+            self.get_logger().warning(f'CAN stop: {e!s}')
+        try:
+            self._can_bus.shutdown()
+        except Exception:
+            pass
+        self._can_bus = None
 
 
 def main(args=None):

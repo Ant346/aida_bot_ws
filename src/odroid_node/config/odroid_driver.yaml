@@ -1,7 +1,19 @@
-# Parameters for node name `odroid_driver` (see odroid_driver.launch.py)
+# ROS 2 node name: odroid_driver
 odroid_driver:
   ros__parameters:
-    # Match /dev/serial/by-id/* substring for each USB–serial bridge
+    # uart_hoverboard = CH341 + старый бинарный протокол; socketcan_odrive = ODrive после slcan (can0/can1).
+    transport: "socketcan_odrive"
+    can_interface: "can0"
+    can_bitrate: 250000
+    # NODE ID осей как в вашем ODrive (axis0 часто = 0). Не используемая ось: -1.
+    axis_id_fl: 0
+    axis_id_fr: -1
+    axis_id_rl: -1
+    axis_id_rr: -1
+    can_invert_rl: true
+    can_invert_rr: true
+    torque_ff: 0.0
+
     front_serial: "0001"
     rear_serial: "0002"
     baudrate: 115200
@@ -10,10 +22,9 @@ odroid_driver:
     wheel_base: 0.635
     wheel_track: 0.72
     max_speed: 50
-    test_speed: 0
-    # true: log commands only, no serial (useful in Docker without hardware)
+    # Для CAN test_wheel: целевая скорость FL в об/с (turns/s). Для UART — масштаб как раньше.
+    test_speed: 3.0
     simulation_mode: false
-    # Match ds4_twist when launch uses stamped:=true
     cmd_vel_subscribe_stamped: false
     angular_z_scale: 2.0
     wheel_odometry_topic: "wheel_odometry"
