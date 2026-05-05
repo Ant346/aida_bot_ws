@@ -3,7 +3,7 @@
 <package format="3">
   <name>odroid_node</name>
   <version>0.0.0</version>
-  <description>Odroid driver node for ROS2 with ODrive CAN control</description>
+  <description>Odroid host node: cmd_vel to mecanum wheel boards (serial hoverboard-style protocol)</description>
   <maintainer email="ris2012.r@yandex.ru">odroid</maintainer>
   <license>TODO: License declaration</license>
 
@@ -16,8 +16,10 @@
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>std_srvs</exec_depend>
-  <exec_depend>python3-can</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>ros2launch</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-serial</exec_depend>
   <exec_depend>ds4_driver_msgs</exec_depend>
 
   <export>

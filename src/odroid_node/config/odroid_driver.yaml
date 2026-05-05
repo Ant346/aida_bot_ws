@@ -1,0 +1,19 @@
+# Parameters for node name `odroid_driver` (see odroid_driver.launch.py)
+odroid_driver:
+  ros__parameters:
+    # Match /dev/serial/by-id/* substring for each USB–serial bridge
+    front_serial: "0001"
+    rear_serial: "0002"
+    baudrate: 115200
+    timeout: 0.05
+    wheel_radius: 0.095
+    wheel_base: 0.635
+    wheel_track: 0.72
+    max_speed: 50
+    test_speed: 0
+    # true: log commands only, no serial (useful in Docker without hardware)
+    simulation_mode: false
+    # Match ds4_twist when launch uses stamped:=true
+    cmd_vel_subscribe_stamped: false
+    angular_z_scale: 2.0
+    wheel_odometry_topic: "wheel_odometry"
