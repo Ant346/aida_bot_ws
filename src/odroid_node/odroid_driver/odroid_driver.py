@@ -50,11 +50,16 @@ class OdroidDriver(Node):
                 ('timeout', 0.05),
                 # SocketCAN (интерфейс после slcand + ip link, обычно can0/can1)
                 ('can_interface', 'can0'),
+                # Если непусто и отличается от can_interface: FL/FR на передней шине,
+                # RL/RR на задней (два USB-CAN, см. odroid_v_3.6/README_CAN.md).
+                ('can_interface_rear', ''),
                 ('can_bitrate', 250000),
                 ('axis_id_fl', 0),
-                ('axis_id_fr', -1),
-                ('axis_id_rl', -1),
-                ('axis_id_rr', -1),
+                ('axis_id_fr', 1),
+                ('axis_id_rl', 2),
+                ('axis_id_rr', 3),
+                ('can_invert_fl', False),
+                ('can_invert_fr', False),
                 ('can_invert_rl', True),
                 ('can_invert_rr', True),
                 ('torque_ff', 0.0),
@@ -66,7 +71,9 @@ class OdroidDriver(Node):
         self.front_buffer = bytearray()
         self.rear_buffer = bytearray()
         self._transport_kind = 'none'  # none | uart | can
-        self._can_bus = None
+        self._can_bus_front = None
+        self._can_bus_rear = None
+        self._can_unique_buses = []
         self._can_imported = None
 
         self._init_boards()
@@ -151,10 +158,12 @@ class OdroidDriver(Node):
             iface = self.get_parameter('can_interface').get_parameter_value().string_value.strip()
             if not iface:
                 iface = 'can0'
+            iface_rear = self.get_parameter('can_interface_rear').get_parameter_value().string_value.strip()
             rate = int(self.get_parameter('can_bitrate').value)
             try:
-                self._can_bus = can_mod.interface.Bus(
+                self._can_bus_front = can_mod.interface.Bus(
                     bustype='socketcan', channel=iface, bitrate=rate)
+                self._can_unique_buses = [self._can_bus_front]
             except Exception as e:
                 raise RuntimeError(
                     f'Не удалось открыть SocketCAN `{iface}` '
@@ -162,17 +171,41 @@ class OdroidDriver(Node):
                     f'{e}',
                 ) from e
 
+            if iface_rear and iface_rear != iface:
+                try:
+                    self._can_bus_rear = can_mod.interface.Bus(
+                        bustype='socketcan', channel=iface_rear, bitrate=rate)
+                    self._can_unique_buses.append(self._can_bus_rear)
+                except Exception as e:
+                    raise RuntimeError(
+                        f'Не удалось открыть SocketCAN заднюю шину `{iface_rear}`: {e}',
+                    ) from e
+                self.get_logger().info(
+                    f'SocketCAN перед `{iface}`, зад `{iface_rear}`, bitrate={rate}')
+            else:
+                self._can_bus_rear = self._can_bus_front
+                self.get_logger().info(f'SocketCAN одна шина `{iface}`, bitrate={rate}')
+
             self._transport_kind = 'can'
-            self.get_logger().info(f'SocketCAN `{iface}`, bitrate={rate}')
 
             aids = tuple(
                 int(self.get_parameter(n).value)
                 for n in ('axis_id_fl', 'axis_id_fr', 'axis_id_rl', 'axis_id_rr'))
+            n_en = sum(1 for a in aids if a >= 0)
+            if n_en < 4:
+                self.get_logger().warning(
+                    f'CAN: включено колёс {n_en}/4 (остальные axis_id_* = -1 не получают команд). '
+                    'Проверь odroid_driver.yaml.'
+                )
+
+            names = ('axis_id_fl', 'axis_id_fr', 'axis_id_rl', 'axis_id_rr')
             started = False
-            for aid in aids:
+            for i, pname in enumerate(names):
+                aid = int(self.get_parameter(pname).value)
                 if aid < 0:
                     continue
-                self._can_set_axis_state(aid, _AXIS_CLOSED_LOOP_CONTROL)
+                bus = self._can_bus_front if i < 2 else self._can_bus_rear
+                self._can_set_axis_state(aid, _AXIS_CLOSED_LOOP_CONTROL, bus)
                 started = True
             if started:
                 time.sleep(0.35)
@@ -279,23 +312,23 @@ class OdroidDriver(Node):
         lim = lambda om: max(-1000, min(1000, int(om * sc)))
         return lim(fl), lim(fr), lim(rl), lim(rr)
 
-    def _can_set_axis_state(self, axis_id: int, state: int):
+    def _can_set_axis_state(self, axis_id: int, state: int, bus):
         cid = (axis_id << 5) | _CAN_SET_AXIS_STATE
         data = int(state).to_bytes(4, 'little')
         msg = self._can_mod().Message(arbitration_id=cid, data=data, is_extended_id=False)
         try:
-            self._can_bus.send(msg)
+            bus.send(msg)
         except Exception as e:
             self.get_logger().error(f'CAN set_state axis={axis_id}: {e!s}')
 
-    def _can_send_vel_turns(self, axis_id: int, turns_s: float, tq: float):
+    def _can_send_vel_turns(self, axis_id: int, turns_s: float, tq: float, bus):
         if axis_id < 0:
             return
         cid = (axis_id << 5) | _CAN_SET_INPUT_VEL
         data = struct.pack('<ff', float(turns_s), float(tq))
         msg = self._can_mod().Message(arbitration_id=cid, data=data, is_extended_id=False)
         try:
-            self._can_bus.send(msg)
+            bus.send(msg)
         except Exception as e:
             self.get_logger().error(f'CAN velocity axis={axis_id}: {e!s}')
 
@@ -305,7 +338,9 @@ class OdroidDriver(Node):
             int(self.get_parameter(k).value)
             for k in ('axis_id_fl', 'axis_id_fr', 'axis_id_rl', 'axis_id_rr')
         ]
-        inv_r = -1.0 if bool(self.get_parameter('can_invert_rl').value) else 1.0
+        inv_fl = -1.0 if bool(self.get_parameter('can_invert_fl').value) else 1.0
+        inv_fr = -1.0 if bool(self.get_parameter('can_invert_fr').value) else 1.0
+        inv_rl = -1.0 if bool(self.get_parameter('can_invert_rl').value) else 1.0
         inv_rr = -1.0 if bool(self.get_parameter('can_invert_rr').value) else 1.0
 
         while self.running and rclpy.ok():
@@ -314,9 +349,9 @@ class OdroidDriver(Node):
                     vx, vy, wz = self.target_vel.tolist()
 
                 fl_r, fr_r, rl_r, rr_r = self._wheel_omega_rad_s(vx, vy, wz)
-                fl_t = fl_r / TAU
-                fr_t = fr_r / TAU
-                rl_t = rl_r * inv_r / TAU
+                fl_t = fl_r * inv_fl / TAU
+                fr_t = fr_r * inv_fr / TAU
+                rl_t = rl_r * inv_rl / TAU
                 rr_t = rr_r * inv_rr / TAU
 
                 spins = [fl_t, fr_t, rl_t, rr_t]
@@ -324,8 +359,9 @@ class OdroidDriver(Node):
                 self.get_logger().debug(
                     f'CAN vx vy wz {(vx, vy, wz)} turns/s {spins}')
 
-                for aid, tsp in zip(aids, spins):
-                    self._can_send_vel_turns(aid, tsp, tq)
+                for i, (aid, tsp) in enumerate(zip(aids, spins)):
+                    bus = self._can_bus_front if i < 2 else self._can_bus_rear
+                    self._can_send_vel_turns(aid, tsp, tq, bus)
 
                 time.sleep(0.02)
             except Exception as e:
@@ -438,16 +474,16 @@ class OdroidDriver(Node):
         t = self._norm_transport()
 
         try:
-            if not sim and t == 'can' and self._can_bus is not None:
+            if not sim and t == 'can' and self._can_bus_front is not None:
                 turns_s = float(self.get_parameter('test_speed').value)
                 aid0 = int(self.get_parameter('axis_id_fl').value)
                 iq = float(self.get_parameter('torque_ff').value)
                 vt = turns_s if abs(turns_s) > 1e-6 else 3.0
                 self.get_logger().info(f'test_wheel CAN FL @ {vt} turns/s')
                 if aid0 >= 0:
-                    self._can_send_vel_turns(aid0, vt, iq)
+                    self._can_send_vel_turns(aid0, vt, iq, self._can_bus_front)
                     time.sleep(2.0)
-                    self._can_send_vel_turns(aid0, 0.0, iq)
+                    self._can_send_vel_turns(aid0, 0.0, iq, self._can_bus_front)
                 else:
                     self.get_logger().warning('axis_id_fl < 0')
             elif not sim and self.front_port:
@@ -505,7 +541,7 @@ class OdroidDriver(Node):
         super().destroy_node()
 
     def _shutdown_can_axes(self):
-        if self._can_bus is None:
+        if self._can_bus_front is None:
             return
 
         aids = [
@@ -513,18 +549,22 @@ class OdroidDriver(Node):
             for k in ('axis_id_fl', 'axis_id_fr', 'axis_id_rl', 'axis_id_rr')
         ]
         try:
-            for aid in aids:
+            for i, aid in enumerate(aids):
                 if aid < 0:
                     continue
-                self._can_send_vel_turns(aid, 0.0, 0.0)
-                self._can_set_axis_state(aid, _AXIS_IDLE)
+                bus = self._can_bus_front if i < 2 else self._can_bus_rear
+                self._can_send_vel_turns(aid, 0.0, 0.0, bus)
+                self._can_set_axis_state(aid, _AXIS_IDLE, bus)
         except Exception as e:
             self.get_logger().warning(f'CAN stop: {e!s}')
-        try:
-            self._can_bus.shutdown()
-        except Exception:
-            pass
-        self._can_bus = None
+        for bus in self._can_unique_buses:
+            try:
+                bus.shutdown()
+            except Exception:
+                pass
+        self._can_bus_front = None
+        self._can_bus_rear = None
+        self._can_unique_buses = []
 
 
 def main(args=None):

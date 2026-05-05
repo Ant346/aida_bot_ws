@@ -3,15 +3,26 @@ odroid_driver:
   ros__parameters:
     # uart_hoverboard = CH341 + старый бинарный протокол; socketcan_odrive = ODrive после slcan (can0/can1).
     transport: "socketcan_odrive"
+    # Устройства на хосте: /dev/can_front → после sudo odroid_v_3.6/start_can.sh это интерфейс can0;
+    # /dev/can_rear → can1. В параметрах ниже только имена из ip link (can0/can1), не пути /dev/...
     can_interface: "can0"
+    # Вторая шина для RL/RR. Если все четыре ODrive на одном CAN — поставьте "" и задайте четыре
+    # уникальных axis id на этой шине (например 0–3).
+    can_interface_rear: "can1"
     can_bitrate: 250000
-    # NODE ID осей как в вашем ODrive (axis0 часто = 0). Не используемая ось: -1.
+    # На каждой из двух изолированных шин node id часто снова 0 и 1. Если задняя шина отключена
+    # или имена после ip link другие — см. вывод ip link show (обычно can0 и can1).
     axis_id_fl: 0
-    axis_id_fr: -1
-    axis_id_rl: -1
-    axis_id_rr: -1
-    can_invert_rl: true
-    can_invert_rr: true
+    axis_id_fr: 1
+    axis_id_rl: 0
+    axis_id_rr: 1
+    # Знак +velocity в ODrive должен совпадать с «вперёд» робота для каждого колеса.
+    # Если при чистом vx перед и зад крутятся навстречу — выключите инверсию задней оси или
+    # включите на передней (подбирайте по месту).
+    can_invert_fl: false
+    can_invert_fr: false
+    can_invert_rl: false
+    can_invert_rr: false
     torque_ff: 0.0
 
     front_serial: "0001"
@@ -21,7 +32,7 @@ odroid_driver:
     wheel_radius: 0.095
     wheel_base: 0.635
     wheel_track: 0.72
-    max_speed: 50
+    max_speed: 100
     # Для CAN test_wheel: целевая скорость FL в об/с (turns/s). Для UART — масштаб как раньше.
     test_speed: 3.0
     simulation_mode: false
