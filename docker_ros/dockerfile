@@ -1,0 +1,225 @@
+FROM ros:humble
+
+# # 1. ПОЛНОСТЬЮ переписать sources.list в старом формате (удаляем .sources файлы)
+# RUN set -eux; \
+#     rm -f /etc/apt/sources.list.d/*.sources; \
+#     echo 'deb http://mirror.yandex.ru/ubuntu jammy main restricted universe multiverse' > /etc/apt/sources.list; \
+#     echo 'deb http://mirror.yandex.ru/ubuntu jammy-updates main restricted universe multiverse' >> /etc/apt/sources.list; \
+#     echo 'deb http://mirror.yandex.ru/ubuntu jammy-security main restricted universe multiverse' >> /etc/apt/sources.list; \
+#     rm -rf /var/lib/apt/lists/* && \
+#     apt-get update
+
+# ROS 2 APT is already configured in ros:humble (Deb822 .sources). Do not add
+# ros2.list + a keyring file — APT errors with conflicting Signed-By for the
+# same http://packages.ros.org/ros2/ubuntu suite.
+
+# 3. Базовые инструменты + зависимости сборки realsense2_camera из src/realsense-ros
+#    (find_package в CMakeLists.txt / package.xml; librealsense2 — отдельным RUN ниже).
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y \
+        build-essential \
+        git \
+        cmake \
+        python3-pip \
+        python3-serial \
+        python3-numpy \
+        python3-colcon-common-extensions \
+        ros-humble-rviz2 \
+        libeigen3-dev \
+        libopencv-dev \
+        ros-humble-builtin-interfaces \
+        ros-humble-cv-bridge \
+        ros-humble-diagnostic-updater \
+        ros-humble-geometry-msgs \
+        ros-humble-image-transport \
+        ros-humble-lifecycle-msgs \
+        ros-humble-nav-msgs \
+        ros-humble-rclcpp \
+        ros-humble-rclcpp-action \
+        ros-humble-rclcpp-components \
+        ros-humble-rclcpp-lifecycle \
+        ros-humble-ros-environment \
+        ros-humble-sensor-msgs \
+        ros-humble-std-msgs \
+        ros-humble-std-srvs \
+        ros-humble-tf2 \
+        ros-humble-tf2-ros \
+        libgl1-mesa-dri \
+        libgl1 \
+        mesa-utils \
+        vim \
+        nano \
+        tmux \
+        zsh \
+        curl \
+        wget \
+        htop \
+        tree \
+        udev \
+        joystick \
+        python3-evdev \
+        python3-psutil \
+        xauth \
+        && rm -rf /var/lib/apt/lists/*
+
+# librealsense2: the ros:humble image does not ship Ubuntu .debs for librealsense2-utils / -dev
+# (packages are not in the enabled APT suites). Options:
+#   - Default (0): build SDK from GitHub with RSUSB backend (no Intel APT, matches CMake >=2.56.6 in realsense2_camera).
+#   - USE_INTEL_LIBREALSENSE_APT=1: install from librealsense.realsenseai.com (needs reliable access to their CDN).
+ARG USE_INTEL_LIBREALSENSE_APT=0
+# Must satisfy realsense2_camera CMake: find_package(realsense2 2.56.6)
+ARG LIBREALSENSE_GIT_TAG=v2.57.7
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates curl gnupg; \
+    if [ "${USE_INTEL_LIBREALSENSE_APT}" = "1" ]; then \
+        mkdir -p /etc/apt/keyrings; \
+        curl -sSf https://librealsense.realsenseai.com/Debian/librealsenseai.asc | gpg --dearmor -o /etc/apt/keyrings/librealsenseai.gpg; \
+        echo "deb [signed-by=/etc/apt/keyrings/librealsenseai.gpg] https://librealsense.realsenseai.com/Debian/apt-repo jammy main" \
+            > /etc/apt/sources.list.d/librealsense.list; \
+        apt-get update; \
+        apt-get install -y --no-install-recommends \
+            -o Acquire::Retries=5 \
+            -o Acquire::http::Timeout=120 \
+            -o Acquire::https::Timeout=120 \
+            librealsense2-utils librealsense2-dev; \
+    else \
+        apt-get install -y --no-install-recommends \
+            git \
+            libusb-1.0-0-dev \
+            libssl-dev \
+            libudev-dev \
+            pkg-config \
+            libglfw3-dev \
+            libgl1-mesa-dev; \
+        git clone --depth 1 --branch "${LIBREALSENSE_GIT_TAG}" https://github.com/realsenseai/librealsense.git /tmp/librealsense; \
+        cmake -S /tmp/librealsense -B /tmp/librealsense/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DBUILD_EXAMPLES=OFF \
+            -DBUILD_GRAPHICAL_EXAMPLES=ON \
+            -DBUILD_WITH_OPENMP=ON \
+            -DBUILD_WITH_RSUSB_BACKEND=ON; \
+        cmake --build /tmp/librealsense/build -j"$(nproc)"; \
+        cmake --install /tmp/librealsense/build; \
+        ldconfig; \
+        rm -rf /tmp/librealsense; \
+    fi; \
+    rm -rf /var/lib/apt/lists/*
+
+# Host still needs udev too (bind-mounted /dev): ./install_realsense_udev_host.sh
+# realsense-viewer checks for /etc/udev/rules.d/99-realsense-libusb.rules inside the container.
+COPY udev/99-realsense-libusb.rules /etc/udev/rules.d/99-realsense-libusb.rules
+RUN chmod 644 /etc/udev/rules.d/99-realsense-libusb.rules \
+    && cp /etc/udev/rules.d/99-realsense-libusb.rules /root/.99-realsense-libusb.rules
+
+# Set the working directory
+WORKDIR /workspace
+
+# Set zsh as the default shell
+SHELL ["/bin/zsh", "-c"]
+
+# Install Oh My Zsh и плагины
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended && \
+    ZSH_CUSTOM=${ZSH_CUSTOM:-/root/.oh-my-zsh/custom} && \
+    git clone https://github.com/zsh-users/zsh-autosuggestions.git $ZSH_CUSTOM/plugins/zsh-autosuggestions && \
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git $ZSH_CUSTOM/plugins/zsh-syntax-highlighting && \
+    git clone https://github.com/zsh-users/zsh-completions.git $ZSH_CUSTOM/plugins/zsh-completions && \
+    sed -i 's/plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-completions)/' /root/.zshrc
+
+# Install Python dependencies
+RUN pip3 install --no-cache-dir \
+    numpy \
+    pyserial \
+    matplotlib \
+    ipython \
+    jupyter \
+    evdev \
+    psutil \
+    python-can
+
+# ds4_driver imports this at runtime; not vendored in the ROS package. See
+# ds4_driver_submodule/README.md and ds4_driver_submodule/docker/Dockerfile.
+RUN set -eux; \
+    git clone --depth 1 --branch devel https://github.com/naoki-mizuno/ds4drv /tmp/ds4drv; \
+    pip3 install --no-cache-dir /tmp/ds4drv; \
+    rm -rf /tmp/ds4drv
+
+# Create a better zsh configuration
+RUN echo 'export PATH="/opt/ros/humble/bin:$PATH"' >> /root/.zshrc && \
+    echo 'export LD_LIBRARY_PATH="/usr/local/lib:/opt/ros/humble/lib:$LD_LIBRARY_PATH"' >> /root/.zshrc && \
+    echo 'export PYTHONPATH="/opt/ros/humble/lib/python3/dist-packages:$PYTHONPATH"' >> /root/.zshrc && \
+    echo 'export CMAKE_PREFIX_PATH="/usr/local:/opt/ros/humble:$CMAKE_PREFIX_PATH"' >> /root/.zshrc && \
+    echo 'alias ll="ls -la"' >> /root/.zshrc && \
+    echo 'alias build="colcon build --symlink-install"' >> /root/.zshrc && \
+    echo 'alias build-pkg="colcon build --packages-select"' >> /root/.zshrc && \
+    echo 'alias source-ws="source install/setup.zsh"' >> /root/.zshrc && \
+    echo 'alias clean="colcon clean"' >> /root/.zshrc && \
+    echo 'alias build-ds4="colcon build --packages-select ds4_driver_msgs ds4_driver --symlink-install"' >> /root/.zshrc && \
+    echo 'alias test-ds4="ros2 launch ds4_driver ds4_twist.launch.xml"' >> /root/.zshrc && \
+    echo 'alias ds4-status="ls -la /dev/input/js* && ls -la /dev/input/event*"' >> /root/.zshrc
+
+# Source ROS2 в zsh profile
+RUN echo "source /opt/ros/humble/setup.zsh" >> /root/.zshrc && \
+    echo "source /workspace/install/setup.zsh" >> /root/.zshrc
+
+# Файл без ведущей точки — не теряется в контексте сборки; читается как /etc/tmux.conf и ~/.tmux.conf
+COPY tmux.conf /etc/tmux.conf
+COPY tmux.conf /root/.tmux.conf
+
+# Copy entrypoint script
+# CACHE_BUST: bump when copying entrypoints so `docker compose build` is not stale vs host-only edits.
+COPY entrypoint-x11.bash /entrypoint-x11.bash
+COPY entrypoint.bash /entrypoint.bash
+COPY entrypoint_rviz.bash /entrypoint_rviz.bash
+RUN chmod +x /entrypoint.bash /entrypoint_rviz.bash
+
+# docker compose exec / docker exec start a NEW process: they get Compose env (often wrong DISPLAY),
+# not exports from PID1. BASH_ENV only applies to non-interactive bash. So we load /run/aida-x11.env
+# (written at container start by entrypoint-x11.bash) from root rc files and login profile.
+RUN printf '%s\n' '[ -r /run/aida-x11.env ] && . /run/aida-x11.env' >/etc/profile.d/aida-x11-env.sh \
+    && printf '%s\n' '[ -r /run/aida-x11.env ] && . /run/aida-x11.env' >/etc/bash.aida-xenv \
+    && chmod 644 /etc/profile.d/aida-x11-env.sh /etc/bash.aida-xenv \
+    && mkdir -p /etc/zsh \
+    && grep -qxF '[ -r /run/aida-x11.env ] && source /run/aida-x11.env' /etc/zsh/zshenv 2>/dev/null \
+    || echo '[ -r /run/aida-x11.env ] && source /run/aida-x11.env' >>/etc/zsh/zshenv \
+    && printf '%s\n' '[ -r /run/aida-x11.env ] && . /run/aida-x11.env' >/root/.zshenv \
+    && chmod 644 /root/.zshenv \
+    && (grep -qxF '[ -r /run/aida-x11.env ] && . /run/aida-x11.env' /root/.bashrc 2>/dev/null \
+        || printf '\n# X11 for docker exec (same DISPLAY/XAUTHORITY as PID1)\n[ -r /run/aida-x11.env ] && . /run/aida-x11.env\n' >>/root/.bashrc)
+ENV BASH_ENV=/etc/bash.aida-xenv
+
+# Copy ROS2 session script
+COPY start_ros2_session.sh /usr/local/bin/start_ros2_session.sh
+RUN chmod +x /usr/local/bin/start_ros2_session.sh
+
+# Create a development helper script
+RUN echo '#!/bin/bash' > /usr/local/bin/dev-setup && \
+    echo 'echo "🔨 Setting up development environment..."' >> /usr/local/bin/dev-setup && \
+    echo 'cd /workspace' >> /usr/local/bin/dev-setup && \
+    echo 'if [ ! -f "install/setup.zsh" ]; then' >> /usr/local/bin/dev-setup && \
+    echo '    echo "Building workspace..."' >> /usr/local/bin/dev-setup && \
+    echo '    colcon build --symlink-install' >> /usr/local/bin/dev-setup && \
+    echo '    echo "✅ Workspace built successfully!"' >> /usr/local/bin/dev-setup && \
+    echo 'fi' >> /usr/local/bin/dev-setup && \
+    echo 'source install/setup.zsh' >> /usr/local/bin/dev-setup && \
+    echo 'echo "🎯 Development environment Ready!"' >> /usr/local/bin/dev-setup && \
+    echo 'exec zsh' >> /usr/local/bin/dev-setup && \
+    chmod +x /usr/local/bin/dev-setup
+
+# Create DS4 driver helper script
+RUN echo '#!/bin/bash' > /usr/local/bin/ds4-setup && \
+    echo 'echo "🎮 Setting up DS4 Driver..."' >> /usr/local/bin/ds4-setup && \
+    echo 'cd /workspace' >> /usr/local/bin/ds4-setup && \
+    echo 'echo "Building DS4 driver packages..."' >> /usr/local/bin/ds4-setup && \
+    echo 'colcon build --packages-select ds4_driver_msgs ds4_driver --symlink-install' >> /usr/local/bin/ds4-setup && \
+    echo 'source install/setup.zsh' >> /usr/local/bin/ds4-setup && \
+    echo 'echo "🎮 DS4 Driver ready!"' >> /usr/local/bin/ds4-setup && \
+    echo 'echo "Available commands:"' >> /usr/local/bin/ds4-setup && \
+    echo 'echo "  test-ds4: Launch DS4 twist controller"' >> /usr/local/bin/ds4-setup && \
+    echo 'echo "  ds4-status: Check joystick devices"' >> /usr/local/bin/ds4-setup && \
+    chmod +x /usr/local/bin/ds4-setup
+
+# Set default command to zsh
+CMD ["/bin/zsh"]

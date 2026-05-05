@@ -1,41 +1,98 @@
 services:
   ds4driver:
     build:
-      context: ./ds4_driver_submodule/docker
-      dockerfile: Dockerfile
+      context: ./docker_ros
+      dockerfile: dockerfile
     volumes:
       - ./ds4_driver_submodule:/workspace/ds4_driver_submodule
+      - ./src:/workspace/src
+      - ./build:/workspace/build
+      - ./install:/workspace/install
       - /dev:/dev
     environment:
       - ROS_DISTRO=humble
+      - ROS_DOMAIN_ID=0
     entrypoint: ["/entrypoint.bash"]
     command: ["ros2", "launch", "ds4_driver", "ds4_twist.launch.xml"]
     privileged: true
+    network_mode: host
 
-  hoverboard_node:
+  odroid_node:
     build:
-      context: ./hoverboard_node
-      dockerfile: dockerfile
-    volumes:
-      - ./hoverboard_node:/workspace/hoverboard_node
-      - /dev:/dev
-    environment:
-      - ROS_DISTRO=humble
-    entrypoint: ["/entrypoint.bash"]
-    command: ["ros2", "launch", "hoverboard_node", "hoverboard_driver.launch.py"]
-    privileged: true
-
-  ds4_driver_dev:
-    build:
-      context: ./hoverboard_node
+      context: ./docker_ros
       dockerfile: dockerfile
     volumes:
       - ./ds4_driver_submodule:/workspace/ds4_driver_submodule
+      - ./src:/workspace/src
+      - ./build:/workspace/build
+      - ./install:/workspace/install
       - /dev:/dev
     environment:
       - ROS_DISTRO=humble
+      - ROS_DOMAIN_ID=0
     entrypoint: ["/entrypoint.bash"]
-    command: ["/bin/zsh"]
+    command: ["ros2", "launch", "odroid_node", "odroid_driver.launch.py"]
     privileged: true
-    stdin_open: true
-    tty: true
+    network_mode: host
+    depends_on:
+      - ds4driver
+
+  realsense:
+    build:
+      context: ./docker_ros
+      dockerfile: dockerfile
+    volumes:
+      - ./ds4_driver_submodule:/workspace/ds4_driver_submodule
+      - ./src:/workspace/src
+      - ./build:/workspace/build
+      - ./install:/workspace/install
+      - /dev:/dev
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      # So container hostname matches Xauth entries for DISPLAY=:0 (see docker_ros/entrypoint.bash).
+      - /etc/hostname:/run/host-etc-hostname:ro
+      # Wayland/GDM often puts cookies in $XAUTHORITY under /run/user/... not ~/.Xauthority.
+      - ${XAUTHORITY_HOST:-${XAUTHORITY:-${HOME}/.Xauthority}}:/root/.Xauthority:ro
+    environment:
+      - ROS_DISTRO=humble
+      - ROS_DOMAIN_ID=0
+      # Значение ниже можно оставить :0 или из echo $DISPLAY; entrypoint переопределит по socket + .Xauthority.
+      - DISPLAY=${DISPLAY:-:0}
+      # Writable merge of host /root/.Xauthority; same path for PID1 and docker compose exec.
+      - XAUTHORITY=/tmp/.x11-docker-authority
+      - QT_X11_NO_MITSHM=1
+      - QT_QPA_PLATFORM=xcb
+    entrypoint: ["/entrypoint.bash"]
+    command:
+      ["ros2", "launch", "realsense_bringup", "d435_default.launch.py"]
+    privileged: true
+    network_mode: host
+    ipc: host
+
+  rviz:
+    profiles: ["viz"]
+    build:
+      context: ./docker_ros
+      dockerfile: dockerfile
+    volumes:
+      - ./ds4_driver_submodule:/workspace/ds4_driver_submodule
+      - ./src:/workspace/src
+      - ./build:/workspace/build
+      - ./install:/workspace/install
+      - ./docker_ros/rviz:/workspace/rviz_configs:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /etc/hostname:/run/host-etc-hostname:ro
+      - ${XAUTHORITY_HOST:-${XAUTHORITY:-${HOME}/.Xauthority}}:/root/.Xauthority:ro
+    environment:
+      - ROS_DISTRO=humble
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      # Match realsense: empty host DISPLAY breaks x11 discovery; default :0 for local sessions.
+      - DISPLAY=${DISPLAY:-:0}
+      - XAUTHORITY=/tmp/.x11-docker-authority
+      - QT_X11_NO_MITSHM=1
+      - QT_QPA_PLATFORM=xcb
+      - LIBGL_ALWAYS_SOFTWARE=1
+      - GALLIUM_DRIVER=llvmpipe
+    network_mode: host
+    ipc: host
+    entrypoint: ["/entrypoint_rviz.bash"]
+    command: ["rviz2", "-d", "/workspace/rviz_configs/d435.rviz"]
