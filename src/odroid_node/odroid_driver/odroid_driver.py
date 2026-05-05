@@ -193,7 +193,7 @@ class OdroidDriver(Node):
         rr = (vx - vy - (self.L + self.W) * wz) / self.R
 
         if abs(vy) < 0.01 and abs(wz) < 0.01:
-            self.get_logger().info(
+            self.get_logger().debug(
                 f'STRAIGHT vx={vx:.2f} fl={fl:.2f} fr={fr:.2f} rl={rl:.2f} rr={rr:.2f}')
 
         scale = 1000.0 / self.max_speed
@@ -208,12 +208,12 @@ class OdroidDriver(Node):
     def _send_board_command(self, port, left_speed, right_speed, label='board'):
         try:
             if self.get_parameter('simulation_mode').value:
-                self.get_logger().info(f'SIM {label}: L={left_speed} R={right_speed}')
+                self.get_logger().debug(f'SIM {label}: L={left_speed} R={right_speed}')
                 return
 
             left_speed = max(-32768, min(32767, left_speed))
             right_speed = max(-32768, min(32767, right_speed))
-            self.get_logger().info(f'{label}: command L={left_speed} R={right_speed}')
+            self.get_logger().debug(f'{label}: command L={left_speed} R={right_speed}')
 
             start_frame = 0xABCD
             checksum = (start_frame & 0xFFFF) ^ (left_speed & 0xFFFF) ^ (right_speed & 0xFFFF)
@@ -264,7 +264,7 @@ class OdroidDriver(Node):
                     vx, vy, wz = self.target_vel
                     fl, fr, rl, rr = self._inverse_kinematics(vx, vy, wz)
 
-                self.get_logger().info(
+                self.get_logger().debug(
                     f'cmd vx={vx:.2f} vy={vy:.2f} wz={wz:.2f} | FL={fl} FR={fr} RL={rl} RR={rr}')
 
                 self._send_board_command(self.front_port, fl, fr, 'FRONT')
@@ -290,7 +290,7 @@ class OdroidDriver(Node):
                     vx, vy, wz = self.target_vel
                     fl, fr, rl, rr = self._inverse_kinematics(vx, vy, wz)
 
-                self.get_logger().info(f'REAR cmd RL={-rl} RR={-rr}')
+                self.get_logger().debug(f'REAR cmd RL={-rl} RR={-rr}')
                 self._send_board_command(self.rear_port, -rl, -rr, 'REAR')
 
                 if self.get_parameter('simulation_mode').value:
