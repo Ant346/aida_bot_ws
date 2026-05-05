@@ -1,3 +1,8 @@
+[submodule "ds4_driver_submodule"]
+	path = ds4_driver_submodule
+	url = https://github.com/naoki-mizuno/ds4_driver.git
+	branch = humble
+
 [submodule "src/realsense-ros"]
 	path = src/realsense-ros
 	url = https://github.com/realsenseai/realsense-ros.git
