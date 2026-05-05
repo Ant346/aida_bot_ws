@@ -17,6 +17,23 @@ if [[ -f /opt/ros/${ROS_DISTRO:-humble}/setup.bash ]]; then
     source "/opt/ros/${ROS_DISTRO:-humble}/setup.bash"
 fi
 
+# Drop colcon build dirs for packages whose rosidl_adapter json was left corrupt
+# (e.g. two containers interrupted a shared build on ./build).
+_sanitize_rosidl_build_artifacts() {
+    local f pkg
+    shopt -s nullglob
+    for f in /workspace/build/*/rosidl_adapter__arguments__*.json; do
+        [[ -f "$f" ]] || continue
+        if python3 -c 'import json,sys; json.load(open(sys.argv[1],"r",encoding="utf-8"))' "$f" 2>/dev/null; then
+            continue
+        fi
+        pkg=$(basename "$(dirname "$f")")
+        echo "⚠️  Invalid rosidl_adapter json in build/${pkg} — removing build+install for clean reconfigure"
+        rm -rf "/workspace/build/${pkg}" "/workspace/install/${pkg}"
+    done
+    shopt -u nullglob
+}
+
 setup_workspace_structure() {
     cd /workspace
     mkdir -p src
@@ -40,11 +57,13 @@ setup_workspace_structure() {
 build_workspace() {
     cd /workspace
     setup_workspace_structure
+    _sanitize_rosidl_build_artifacts
     if [[ -d "src" ]] && [[ -n "$(ls -A src/ 2>/dev/null)" ]]; then
         rosdep install --from-paths src --ignore-src -r -y --skip-keys=librealsense2 2>/dev/null || true
     fi
     # One invocation: colcon orders packages by dependency (msgs before nodes).
-    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
+    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release \
+        --event-handlers console_direct+
 }
 
 setup_workspace_structure
@@ -53,7 +72,9 @@ NEED_BUILD=false
 if [[ ! -f /workspace/install/setup.bash ]]; then
     NEED_BUILD=true
 else
-    LATEST_SRC=$(find src/ -type f \( -name "*.py" -o -name "*.xml" -o -name "CMakeLists.txt" \) 2>/dev/null | xargs stat -c %Y 2>/dev/null | sort -n | tail -1 || echo 0)
+    LATEST_SRC=$(find src/ -type f \( \
+        -name "*.py" -o -name "*.xml" -o -name "*.msg" -o -name "*.srv" -o \
+        -name "CMakeLists.txt" \) 2>/dev/null | xargs stat -c %Y 2>/dev/null | sort -n | tail -1 || echo 0)
     LATEST_INSTALL=$(stat -c %Y /workspace/install/setup.bash 2>/dev/null || echo 0)
     if [[ -n "$LATEST_SRC" ]] && [[ "$LATEST_SRC" =~ ^[0-9]+$ ]] && [[ "$LATEST_INSTALL" =~ ^[0-9]+$ ]] && [[ "$LATEST_SRC" -gt "$LATEST_INSTALL" ]]; then
         NEED_BUILD=true
@@ -79,14 +100,16 @@ if [[ -f /workspace/install/setup.bash ]] && [[ "$NEED_BUILD" != "true" ]]; then
     fi
 fi
 
-# Several compose services share ./build and ./install; parallel colcon corrupts the tree.
+# Several compose services share ./build and ./install; multiple colcon must not run in parallel.
+# Use append (>>): opening with > truncates and can undermine advisory locking across containers.
 if [[ "$NEED_BUILD" == "true" ]]; then
     mkdir -p /workspace
-    echo "colcon: acquiring shared lock (other containers wait)..."
+    touch /workspace/.colcon_build.lock
+    echo "colcon: acquiring shared lock (other containers wait up to 30 min)..."
     (
         flock -w 1800 9 || { echo "colcon: flock timed out after 30min"; exit 1; }
         build_workspace
-    ) 9>/workspace/.colcon_build.lock
+    ) 9>>/workspace/.colcon_build.lock
 fi
 
 if [[ -f /workspace/install/setup.bash ]]; then

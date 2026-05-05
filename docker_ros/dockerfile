@@ -56,6 +56,7 @@ RUN set -eux; \
         wget \
         htop \
         tree \
+        util-linux \
         udev \
         joystick \
         python3-evdev \
@@ -173,7 +174,7 @@ COPY tmux.conf /root/.tmux.conf
 COPY entrypoint-x11.bash /entrypoint-x11.bash
 COPY entrypoint.bash /entrypoint.bash
 COPY entrypoint_rviz.bash /entrypoint_rviz.bash
-RUN chmod +x /entrypoint.bash /entrypoint_rviz.bash
+RUN chmod +x /entrypoint-x11.bash /entrypoint.bash /entrypoint_rviz.bash
 
 # docker compose exec / docker exec start a NEW process: they get Compose env (often wrong DISPLAY),
 # not exports from PID1. BASH_ENV only applies to non-interactive bash. So we load /run/aida-x11.env
