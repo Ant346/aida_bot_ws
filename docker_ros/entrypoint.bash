@@ -58,34 +58,36 @@ build_workspace() {
     cd /workspace
     setup_workspace_structure
     _sanitize_rosidl_build_artifacts
-    if [[ -d "src" ]] && [[ -n "$(ls -A src/ 2>/dev/null)" ]]; then
+    if [[ -d "src" ]] && [[ -n "$(ls -A src/ 2>/dev/null)" ]] \
+        && [[ "${SKIP_WORKSPACE_ROSDEP:-0}" != "1" ]]; then
         rosdep install --from-paths src --ignore-src -r -y --skip-keys=librealsense2 2>/dev/null || true
+    else
+        [[ "${SKIP_WORKSPACE_ROSDEP:-0}" == "1" ]] && echo "colcon: SKIP_WORKSPACE_ROSDEP=1 — skipping rosdep"
     fi
 
-    # Keep laptop host responsive: colcon default is “use all cores” and feels like a freeze.
-    local _nproc
-    _nproc="$(nproc 2>/dev/null || echo 2)"
-    [[ "${_nproc}" =~ ^[0-9]+$ ]] || _nproc=2
-    export COLCON_PARALLEL_WORKERS="${COLCON_PARALLEL_WORKERS:-2}"
-    if [[ -z "${CMAKE_BUILD_PARALLEL_LEVEL:-}" ]]; then
-        local _jobs=$(( (_nproc + 1) / 2 ))
-        [[ "${_jobs}" -lt 1 ]] && _jobs=1
-        [[ "${_jobs}" -gt 4 ]] && _jobs=4
-        export CMAKE_BUILD_PARALLEL_LEVEL="${_jobs}"
-    fi
-    unset _nproc
-    echo "colcon: COLCON_PARALLEL_WORKERS=${COLCON_PARALLEL_WORKERS} CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL}"
+    # Defaults target low RAM / no OOM: one package at a time, single compile job each.
+    # Faster (uses more RAM): COLCON_EXECUTOR=parallel COLCON_PARALLEL_WORKERS=2 CMAKE_BUILD_PARALLEL_LEVEL=4
+    export COLCON_PARALLEL_WORKERS="${COLCON_PARALLEL_WORKERS:-1}"
+    export CMAKE_BUILD_PARALLEL_LEVEL="${CMAKE_BUILD_PARALLEL_LEVEL:-1}"
+    local _cexec="${COLCON_EXECUTOR:-sequential}"
+    [[ "$_cexec" != "parallel" && "$_cexec" != "sequential" ]] && _cexec=sequential
+
+    echo "colcon: executor=${_cexec} parallel_workers=${COLCON_PARALLEL_WORKERS} CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL}"
 
     local -a COLCON_OPTS=()
     if [[ -n "${COLCON_PACKAGES_SELECT:-}" ]]; then
-        # Space-separated leaf packages (Compose). Skips unrelated heavy builds (realsense2_camera).
         read -r -a _COLCON_PKGS <<< "${COLCON_PACKAGES_SELECT}"
         COLCON_OPTS+=(--packages-select "${_COLCON_PKGS[@]}")
         echo "colcon: COLCON_PACKAGES_SELECT → ${COLCON_PACKAGES_SELECT}"
     fi
-    COLCON_OPTS+=(--executor parallel --parallel-workers "${COLCON_PARALLEL_WORKERS}")
-    # One invocation: colcon orders packages by dependency (msgs before nodes).
-    colcon build --symlink-install "${COLCON_OPTS[@]}" --cmake-args -DCMAKE_BUILD_TYPE=Release \
+    if [[ "${_cexec}" == "parallel" ]]; then
+        COLCON_OPTS+=(--executor parallel --parallel-workers "${COLCON_PARALLEL_WORKERS}")
+    else
+        COLCON_OPTS+=(--executor sequential)
+    fi
+    unset _cexec
+    colcon build --symlink-install "${COLCON_OPTS[@]}" --cmake-args \
+        -DCMAKE_BUILD_TYPE=Release \
         --event-handlers console_direct+
 }
 
