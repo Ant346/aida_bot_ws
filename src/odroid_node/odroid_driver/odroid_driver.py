@@ -25,7 +25,6 @@ class OdroidDriver(Node):
         self.declare_parameters(
             '',
             [
-                ('use_sim_time', False),
                 ('front_serial', '0001'),
                 ('rear_serial', '0002'),
                 ('baudrate', 115200),
