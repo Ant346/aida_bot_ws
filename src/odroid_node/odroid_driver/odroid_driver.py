@@ -43,7 +43,7 @@ class OdroidDriver(Node):
                 ('wheel_base', 0.635),
                 ('wheel_track', 0.72),
                 ('max_speed', 50),
-                ('test_speed', 0),
+                ('test_speed', 3.0),
                 ('front_serial', '0001'),
                 ('rear_serial', '0002'),
                 ('baudrate', 115200),
