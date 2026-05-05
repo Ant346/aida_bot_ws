@@ -19,6 +19,7 @@ setup(
     entry_points={
         'console_scripts': [
             'odroid_driver = odroid_driver.odroid_driver:main',
+            'cmd_vel_mux_node = odroid_driver.cmd_vel_mux_node:main',
         ],
     },
 )
