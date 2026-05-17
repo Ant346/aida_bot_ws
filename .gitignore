@@ -1,5 +1,6 @@
 # --- Machine / repo-local ---
 cp210x-cfg
+greenhouse_pipe_rail_autodock/ #пока игнорим сабмодуль автопарковки
 
 # --- ROS 2 workspace (colcon); matches at repo root and in sub-workspaces ---
 build/

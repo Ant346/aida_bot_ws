@@ -1,10 +1,11 @@
 """
-Mux: /cmd_vel_teleop (ds4_twist) vs /cmd_nav (autonomy) -> /cmd_vel.
+Mux: teleop vs nav vs shaped -> /cmd_vel.
 
-Remap ds4_twist to publish to cmd_vel_teleop, e.g. when starting ds4_twist:
-  ros2 run ds4_driver ds4_twist_node.py --ros-args -r cmd_vel:=cmd_vel_teleop
+- Cross (button_cross): teleop <-> auto (cmd_nav).
+- Square (button_square): shaped <-> previous teleop/auto choice.
 
-Or add the remap in ds4_twist.launch.xml for the ds4_twist node only.
+Remap ds4_twist: cmd_vel -> cmd_vel_teleop
+Publish shaped commands to cmd_vel_shaped.
 """
 
 from launch import LaunchDescription
@@ -28,6 +29,8 @@ def generate_launch_description():
                 'initial_navigation_mode': False,
                 'allow_nav_when_joy_lost': False,
                 'toggle_button_field': 'button_cross',
+                'shaped_cmd_vel_topic': '/cmd_vel_shaped',
+                'shaped_toggle_button_field': 'button_square',
                 'mode_topic': '/cmd_vel_mux/mode',
             }],
         ),

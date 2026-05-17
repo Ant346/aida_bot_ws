@@ -1,0 +1,18 @@
+# Левый стик: вперёд/назад (linear.x). Правый стик: влево/вправо (linear.y).
+# L2 / R2: поворот на месте (angular.z).
+ds4_twist:
+  ros__parameters:
+    inputs:
+      linear:
+        x: axis_left_y
+        y: axis_right_x
+      angular:
+        z: axis_r2 - axis_l2
+    scales:
+      linear:
+        x: 1.0
+        # Минус: согласовать правый стик с base_link (y влево = +linear.y) и меканумом в odroid_driver.
+        # Автоном шлёт /cmd_nav без этого масштаба — навигация не затрагивается.
+        y: -0.5
+      angular:
+        z: 0.5

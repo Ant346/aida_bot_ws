@@ -14,8 +14,17 @@ odroid_driver:
     # или имена после ip link другие — см. вывод ip link show (обычно can0 и can1).
     axis_id_fl: 0
     axis_id_fr: 1
-    axis_id_rl: 0
-    axis_id_rr: 1
+    axis_id_rl: 1
+    axis_id_rr: 0
+
+    # Odrv1 axis0 rr
+    # Odrv1 axis1 rl
+    # Odrv0 axis0 fl
+    # Odrv0 axis1 fr
+    # было так:
+    # axis_id_rl: 0
+    # axis_id_rr: 1
+
     # Знак +velocity в ODrive должен совпадать с «вперёд» робота для каждого колеса.
     # Если при чистом vx перед и зад крутятся навстречу — выключите инверсию задней оси или
     # включите на передней (подбирайте по месту).
@@ -37,5 +46,5 @@ odroid_driver:
     test_speed: 3.0
     simulation_mode: false
     cmd_vel_subscribe_stamped: false
-    angular_z_scale: 2.0
+    angular_z_scale: 10.0
     wheel_odometry_topic: "wheel_odometry"

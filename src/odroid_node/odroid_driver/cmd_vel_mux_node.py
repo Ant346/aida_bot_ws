@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Multiplex Twist teleop vs autonomy using DS4 Status (toggle + watchdog)."""
+"""Multiplex Twist: teleop, nav, shaped via DS4 Status (toggles + watchdog)."""
 
 import rclpy
 from ds4_driver_msgs.msg import Status
@@ -21,11 +21,14 @@ class CmdVelMuxNode(Node):
         self.declare_parameter('initial_navigation_mode', False)
         self.declare_parameter('allow_nav_when_joy_lost', False)
         self.declare_parameter('toggle_button_field', 'button_cross')
+        self.declare_parameter('shaped_cmd_vel_topic', '/cmd_vel_shaped')
+        self.declare_parameter('shaped_toggle_button_field', 'button_square')
         self.declare_parameter('mode_topic', '/cmd_vel_mux/mode')
 
         status_topic = self.get_parameter('status_topic').get_parameter_value().string_value
         teleop_topic = self.get_parameter('teleop_cmd_vel_topic').get_parameter_value().string_value
         nav_topic = self.get_parameter('nav_cmd_vel_topic').get_parameter_value().string_value
+        shaped_topic = self.get_parameter('shaped_cmd_vel_topic').get_parameter_value().string_value
         out_topic = self.get_parameter('cmd_vel_out_topic').get_parameter_value().string_value
         mode_topic = self.get_parameter('mode_topic').get_parameter_value().string_value
 
@@ -41,14 +44,21 @@ class CmdVelMuxNode(Node):
         self._toggle_field = self.get_parameter(
             'toggle_button_field'
         ).get_parameter_value().string_value
+        self._shaped_toggle_field = self.get_parameter(
+            'shaped_toggle_button_field'
+        ).get_parameter_value().string_value
 
         self._last_status_time = None
         self._prev_toggle_pressed = False
+        self._prev_shaped_toggle_pressed = False
+        self._shaped_mode = False
 
         self._teleop = Twist()
         self._nav = Twist()
+        self._shaped = Twist()
         self._have_teleop = False
         self._have_nav = False
+        self._have_shaped = False
 
         _mode_qos = QoSProfile(
             depth=1,
@@ -60,19 +70,22 @@ class CmdVelMuxNode(Node):
         self.create_subscription(Status, status_topic, self._cb_status, 10)
         self.create_subscription(Twist, teleop_topic, self._cb_teleop, 10)
         self.create_subscription(Twist, nav_topic, self._cb_nav, 10)
+        self.create_subscription(Twist, shaped_topic, self._cb_shaped, 10)
 
         rate = max(self.get_parameter('publish_rate_hz').get_parameter_value().double_value, 1.0)
         self.create_timer(1.0 / rate, self._tick)
 
         self._publish_mode()
         self.get_logger().info(
-            f'cmd_vel_mux: teleop={teleop_topic} nav={nav_topic} out={out_topic} '
-            f'status={status_topic} mode_topic={mode_topic} '
-            f'mode={"auto" if self._nav_mode else "teleop"} '
-            f'toggle={self._toggle_field}'
+            f'cmd_vel_mux: teleop={teleop_topic} nav={nav_topic} shaped={shaped_topic} '
+            f'out={out_topic} status={status_topic} mode_topic={mode_topic} '
+            f'mode={self._mode_string()} nav_toggle={self._toggle_field} '
+            f'shaped_toggle={self._shaped_toggle_field}'
         )
 
     def _mode_string(self) -> str:
+        if self._shaped_mode:
+            return 'shaped'
         return 'auto' if self._nav_mode else 'teleop'
 
     def _publish_mode(self):
@@ -85,19 +98,36 @@ class CmdVelMuxNode(Node):
 
         try:
             raw = getattr(msg, self._toggle_field)
+            pressed = bool(raw)
+            if pressed and not self._prev_toggle_pressed:
+                self._nav_mode = not self._nav_mode
+                self._publish_mode()
+                self.get_logger().info(
+                    'Mode: %s' % ('auto (cmd_nav -> cmd_vel)' if self._nav_mode else 'teleop')
+                )
+            self._prev_toggle_pressed = pressed
         except AttributeError:
             self.get_logger().error(f'Unknown toggle_button_field: {self._toggle_field}')
             self._prev_toggle_pressed = False
-            return
 
-        pressed = bool(raw)
-        if pressed and not self._prev_toggle_pressed:
-            self._nav_mode = not self._nav_mode
-            self._publish_mode()
-            self.get_logger().info(
-                'Mode: %s' % ('auto (cmd_nav -> cmd_vel)' if self._nav_mode else 'teleop')
+        try:
+            raw_sq = getattr(msg, self._shaped_toggle_field)
+            sq = bool(raw_sq)
+            if sq and not self._prev_shaped_toggle_pressed:
+                self._shaped_mode = not self._shaped_mode
+                self._publish_mode()
+                self.get_logger().info(
+                    'Mode: %s' % (
+                        'shaped (cmd_vel_shaped -> cmd_vel)' if self._shaped_mode
+                        else ('auto' if self._nav_mode else 'teleop')
+                    )
+                )
+            self._prev_shaped_toggle_pressed = sq
+        except AttributeError:
+            self.get_logger().error(
+                f'Unknown shaped_toggle_button_field: {self._shaped_toggle_field}'
             )
-        self._prev_toggle_pressed = pressed
+            self._prev_shaped_toggle_pressed = False
 
     def _joy_ok(self) -> bool:
         if self._last_status_time is None:
@@ -113,6 +143,10 @@ class CmdVelMuxNode(Node):
         self._nav = msg
         self._have_nav = True
 
+    def _cb_shaped(self, msg: Twist):
+        self._shaped = msg
+        self._have_shaped = True
+
     def _tick(self):
         joy_ok = self._joy_ok()
 
@@ -121,6 +155,10 @@ class CmdVelMuxNode(Node):
                 self._pub.publish(self._nav)
             else:
                 self._pub.publish(Twist())
+            return
+
+        if self._shaped_mode:
+            self._pub.publish(self._shaped if self._have_shaped else Twist())
             return
 
         if self._nav_mode:

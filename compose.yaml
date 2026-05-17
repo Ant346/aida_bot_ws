@@ -5,6 +5,7 @@ services:
       dockerfile: dockerfile
     volumes:
       - ./ds4_driver_submodule:/workspace/ds4_driver_submodule
+      - ./docker_ros/ds4_twist:/workspace/ds4_twist_config:ro
       - ./src:/workspace/src
       - ./build:/workspace/build
       - ./install:/workspace/install
@@ -15,7 +16,8 @@ services:
       # Do not pull realsense2_camera into this service (slow / large); build only DS4.
       COLCON_PACKAGES_SELECT: "ds4_driver_msgs ds4_driver"
     entrypoint: ["/entrypoint.bash"]
-    command: ["ros2", "launch", "ds4_driver", "ds4_twist.launch.xml"]
+    command:
+      ["ros2", "launch", "/workspace/ds4_twist_config/ds4_twist_aida.launch.xml"]
     privileged: true
     network_mode: host
 
@@ -24,6 +26,7 @@ services:
       context: ./docker_ros
       dockerfile: dockerfile
     volumes:
+      - ./rosbag_05_05:/workspace/rosbag_05_05
       - ./ds4_driver_submodule:/workspace/ds4_driver_submodule
       - ./src:/workspace/src
       - ./build:/workspace/build
@@ -33,6 +36,17 @@ services:
       ROS_DISTRO: humble
       ROS_DOMAIN_ID: "0"
       COLCON_PACKAGES_SELECT: "odroid_node"
+      # --- Опциональные оверрайды CAN для launch'а одроида ---
+      # Если задняя CAN-шина мертва (нет адаптера, нет порта на ноуте, и т.п.) —
+      # подними так: `ROBOT_SINGLE_CAN=true docker compose up odroid_node`.
+      # Узел тогда:
+      #   - не открывает can_interface_rear (передняя становится единственной),
+      #   - задаёт axis_id_rl/rr = -1 (задние моторы не получают команд).
+      # Перед стартом всё равно нужно `sudo odroid_v_3.6/start_can.sh` — он сам
+      # пропустит отсутствующий /dev/can_front или /dev/can_rear (warning, не error).
+      ROBOT_SINGLE_CAN: "${ROBOT_SINGLE_CAN:-false}"
+      CAN_INTERFACE: "${CAN_INTERFACE:-}"
+      CAN_INTERFACE_REAR: "${CAN_INTERFACE_REAR:-}"
     entrypoint: ["/entrypoint.bash"]
     # Параметры CAN / UART в src/odroid_node/config/odroid_driver.yaml (transport, can_interface, axis_id_*).
     command: ["ros2", "launch", "odroid_node", "odroid_driver.launch.py"]
@@ -40,6 +54,32 @@ services:
     network_mode: host
     depends_on:
       - ds4driver
+
+  # Legacy CH341 + hoverboard_driver (НЕ CAN). Не поднимать вместе с odroid_node:
+  #   docker compose --profile hoverboard_serial up hoverboard_node
+  hoverboard_node:
+    profiles: ["hoverboard_serial"]
+    build:
+      context: ./hoverboard_node
+      dockerfile: dockerfile
+    volumes:
+      - ./hoverboard_node:/workspace
+      - /dev:/dev
+    environment:
+      ROS_DISTRO: humble
+      ROS_DOMAIN_ID: "0"
+      HOVERBOARD_SIMULATION: "${HOVERBOARD_SIMULATION:-false}"
+    entrypoint: ["/entrypoint.bash"]
+    command:
+      [
+        "ros2",
+        "launch",
+        "hoverboard_node",
+        "hoverboard_driver.launch.py",
+        "simulation_mode:=${HOVERBOARD_SIMULATION:-false}",
+      ]
+    privileged: true
+    network_mode: host
 
   realsense:
     build:
