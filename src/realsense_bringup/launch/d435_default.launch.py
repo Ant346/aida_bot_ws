@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""RealSense: color + aligned depth point cloud. Topics usually /camera/color/image_raw etc."""
+"""RealSense D435 only. device_type keeps this node off a connected D405."""
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -16,6 +16,7 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(rs_launch),
             launch_arguments={
+                'device_type': 'd435',
                 'pointcloud.enable': 'true',
                 'align_depth.enable': 'true',
             }.items(),

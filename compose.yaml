@@ -96,6 +96,7 @@ services:
       - /etc/hostname:/run/host-etc-hostname:ro
       # Wayland/GDM often puts cookies in $XAUTHORITY under /run/user/... not ~/.Xauthority.
       - ${XAUTHORITY_HOST:-${XAUTHORITY:-${HOME}/.Xauthority}}:/root/.Xauthority:ro
+      - ${XDG_RUNTIME_DIR:-/run/user/1000}:/run/host-user-runtime:ro
     environment:
       - ROS_DISTRO=humble
       - ROS_DOMAIN_ID=0
@@ -114,6 +115,66 @@ services:
     network_mode: host
     ipc: host
 
+  # D405 is a separate container so it does not open the D435. Topics: /d405/d405/...
+  # This camera is on USB 2.0; default stream is 848x480x15. USB 3: REALSENSE_D405_DEPTH_PROFILE=848x480x30
+  realsense_d405:
+    build:
+      context: ./docker_ros
+      dockerfile: dockerfile
+    volumes:
+      - ./ds4_driver_submodule:/workspace/ds4_driver_submodule
+      - ./src:/workspace/src
+      - ./build:/workspace/build
+      - ./install:/workspace/install
+      - /dev:/dev
+    environment:
+      - ROS_DISTRO=humble
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - COLCON_PACKAGES_SELECT=realsense2_camera_msgs realsense2_camera realsense2_description realsense_bringup
+      - REALSENSE_D405_SERIAL=${REALSENSE_D405_SERIAL:-218622278337}
+      - REALSENSE_D405_DEPTH_PROFILE=${REALSENSE_D405_DEPTH_PROFILE:-848x480x15}
+    entrypoint: ["/entrypoint.bash"]
+    command:
+      ["ros2", "launch", "realsense_bringup", "d405_default.launch.py"]
+    privileged: true
+    network_mode: host
+    ipc: host
+
+  # ZED-M side-by-side UVC image. zed-ros2-wrapper is not used here: it needs
+  # CUDA and an nvidia runtime, and this host has neither.
+  zedm:
+    build:
+      context: ./docker_ros/zedm
+      dockerfile: Dockerfile
+    image: aida-zedm:humble
+    volumes:
+      - /dev:/dev
+    environment:
+      - ROS_DISTRO=humble
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      # 2560x720 rgb8 is about 5.5 MB. Default Fast DDS buffers reject it and
+      # the node spams "sequence size exceeds remaining buffer".
+      - FASTDDS_BUILTIN_TRANSPORTS=LARGE_DATA
+    # Suspended ZED-M returns EBUSY on open and then drops off the bus.
+    command:
+      - bash
+      - -c
+      - |
+        for d in /sys/bus/usb/devices/*; do
+          [[ -f "$$d/idVendor" ]] || continue
+          if [[ "$$(cat "$$d/idVendor")" == "2b03" && "$$(cat "$$d/idProduct")" == "f682" ]]; then
+            echo on > "$$d/power/control" || true
+          fi
+        done
+        exec ros2 run v4l2_camera v4l2_camera_node --ros-args \
+          -r __ns:=/zedm -r __node:=zedm_camera \
+          -p video_device:=${ZEDM_VIDEO_DEVICE:-/dev/v4l/by-id/usb-Technologies__Inc._ZED-M-video-index0} \
+          -p pixel_format:=YUYV \
+          -p image_size:=[${ZEDM_IMAGE_WIDTH:-2560},${ZEDM_IMAGE_HEIGHT:-720}] \
+          -p camera_frame_id:=zedm_camera_optical_frame
+    privileged: true
+    network_mode: host
+
   rviz:
     profiles: ["viz"]
     build:
@@ -125,9 +186,12 @@ services:
       - ./build:/workspace/build
       - ./install:/workspace/install
       - ./docker_ros/rviz:/workspace/rviz_configs:ro
+      - ./docker_ros/entrypoint-x11.bash:/entrypoint-x11.bash:ro
+      - ./agro_cad/agrobot_description:/opt/agrobot_description:ro
       - /tmp/.X11-unix:/tmp/.X11-unix
       - /etc/hostname:/run/host-etc-hostname:ro
       - ${XAUTHORITY_HOST:-${XAUTHORITY:-${HOME}/.Xauthority}}:/root/.Xauthority:ro
+      - ${XDG_RUNTIME_DIR:-/run/user/1000}:/run/host-user-runtime:ro
     environment:
       - ROS_DISTRO=humble
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
@@ -137,8 +201,9 @@ services:
       - QT_X11_NO_MITSHM=1
       - QT_QPA_PLATFORM=xcb
       - LIBGL_ALWAYS_SOFTWARE=1
+      - FASTDDS_BUILTIN_TRANSPORTS=LARGE_DATA
       - GALLIUM_DRIVER=llvmpipe
     network_mode: host
     ipc: host
     entrypoint: ["/entrypoint_rviz.bash"]
-    command: ["rviz2", "-d", "/workspace/rviz_configs/d435.rviz"]
+    command: ["ros2", "launch", "/workspace/rviz_configs/agrobot.launch.py"]

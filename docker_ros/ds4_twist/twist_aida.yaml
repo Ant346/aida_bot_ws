@@ -10,9 +10,9 @@ ds4_twist:
         z: axis_r2 - axis_l2
     scales:
       linear:
-        x: 1.0
+        x: 2.0
         # Минус: согласовать правый стик с base_link (y влево = +linear.y) и меканумом в odroid_driver.
         # Автоном шлёт /cmd_nav без этого масштаба — навигация не затрагивается.
-        y: -0.5
+        y: -1.0
       angular:
-        z: 0.5
+        z: 1.0

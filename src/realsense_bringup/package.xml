@@ -3,7 +3,7 @@
 <package format="3">
   <name>realsense_bringup</name>
   <version>0.0.1</version>
-  <description>Launch Intel RealSense with RViz-friendly topics (D435).</description>
+  <description>Launch Intel RealSense D435 and D405 on separate namespaces.</description>
   <maintainer email="ris2012.r@yandex.ru">aida</maintainer>
   <license>Apache-2.0</license>
 

@@ -1,6 +1,20 @@
 # --- Machine / repo-local ---
 cp210x-cfg
-greenhouse_pipe_rail_autodock/ #пока игнорим сабмодуль автопарковки
+# Пока не коммитим автопарковку. Комментарий нельзя писать в той же строке:
+# Git считает его частью шаблона, и каталог перестаёт игнорироваться.
+greenhouse_pipe_rail_autodock/
+
+# Росбэги и исходники CAD. Сетки для RViz остаются в
+# agro_cad/agrobot_description/meshes; копия в agro_cad/meshes — дубль.
+*.db3
+*.mcap
+rosbag_*/
+src/rosbags/
+*.step
+*.stp
+*.f3z
+*.f3d
+agro_cad/meshes/
 
 # --- ROS 2 workspace (colcon); matches at repo root and in sub-workspaces ---
 build/

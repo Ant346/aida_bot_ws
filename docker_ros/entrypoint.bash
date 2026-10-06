@@ -150,6 +150,7 @@ echo "Examples:"
 echo "  ros2 launch ds4_driver ds4_twist.launch.xml"
 echo "  ros2 launch odroid_node odroid_driver.launch.py"
 echo "  ros2 launch realsense_bringup d435_default.launch.py"
+echo "  ros2 launch realsense_bringup d405_default.launch.py"
 
 if [[ $# -eq 0 ]]; then
     exec /bin/bash

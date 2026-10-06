@@ -12,6 +12,35 @@
 AIDABOT_XENV="/run/aida-x11.env"
 X11_AUTH_MERGED="${XAUTHORITY:-/tmp/.x11-docker-authority}"
 
+# GNOME on Wayland keeps the live Xwayland cookie in $XDG_RUNTIME_DIR/.mutter-Xwaylandauth.*,
+# not in ~/.Xauthority (that file is often only old ssh -X cookies). The entry is not keyed
+# as :0, so copy it as a wildcard cookie and use the local :0 socket.
+_apply_mutter_cookie() {
+    local f merged="$X11_AUTH_MERGED"
+    [[ -S /tmp/.X11-unix/X0 ]] || return 1
+    command -v xauth >/dev/null 2>&1 || return 1
+    f=$(ls -1t /run/host-user-runtime/.mutter-Xwaylandauth.* 2>/dev/null | head -1 || true)
+    [[ -n "$f" && -r "$f" ]] || return 1
+    # The runtime dir is mounted read-only; xauth refuses to nlist a file it cannot lock.
+    cp -f "$f" /tmp/mutter-xauthority || return 1
+    chmod 600 /tmp/mutter-xauthority
+    rm -f "$merged"
+    umask 077
+    touch "$merged"
+    xauth -f /tmp/mutter-xauthority nlist 2>/dev/null | sed -e 's/^..../ffff/' |
+        xauth -f "$merged" nmerge - 2>/dev/null || return 1
+    xauth -f "$merged" list 2>/dev/null | grep -q MIT-MAGIC-COOKIE || return 1
+    export DISPLAY=:0
+    export XAUTHORITY="$merged"
+    printf 'export DISPLAY=%q\nexport XAUTHORITY=%q\n' ":0" "$merged" >"$AIDABOT_XENV"
+    chmod 644 "$AIDABOT_XENV" 2>/dev/null || true
+    return 0
+}
+
+if _apply_mutter_cookie; then
+    return 0 2>/dev/null || exit 0
+fi
+
 # xauth "list :N" sometimes misses entries keyed as host/unix:N or host:0 — then we fall
 # through to DISPLAY=:0 with no cookie and libX11 prints "Authorization required...".
 _cookie_for_display_num() {

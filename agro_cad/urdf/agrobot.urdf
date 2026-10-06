@@ -1,0 +1,182 @@
+<?xml version="1.0"?>
+<robot name="agrobot">
+  <!-- base_link: геометрический центр. Корпус, направляющие опор и подвеска. -->
+  <link name="base_link">
+    <visual>
+      <geometry><mesh filename="package://agrobot_description/meshes/body.stl"/></geometry>
+    </visual>
+  </link>
+  <link name="front_hit">
+  </link>
+  <joint name="front_hit_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="front_hit"/>
+    <origin xyz="0.601704532 0.000000000 0.273101239" rpy="0.000000000 0.000000000 0.000000000"/>
+  </joint>
+  <link name="wheel_fl">
+    <visual>
+      <geometry><mesh filename="package://agrobot_description/meshes/wheel_fl.stl"/></geometry>
+    </visual>
+  </link>
+  <joint name="wheel_fl_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="wheel_fl"/>
+    <origin xyz="0.317800254 0.316000000 0.103505609" rpy="0.000000000 0.000000000 0.000000000"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+  <link name="wheel_fr">
+    <visual>
+      <geometry><mesh filename="package://agrobot_description/meshes/wheel_fr.stl"/></geometry>
+    </visual>
+  </link>
+  <joint name="wheel_fr_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="wheel_fr"/>
+    <origin xyz="0.317800254 -0.316000000 0.103505609" rpy="0.000000000 0.000000000 0.000000000"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+  <link name="wheel_rl">
+    <visual>
+      <geometry><mesh filename="package://agrobot_description/meshes/wheel_rl.stl"/></geometry>
+    </visual>
+  </link>
+  <joint name="wheel_rl_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="wheel_rl"/>
+    <origin xyz="-0.317800254 0.316000000 0.103505609" rpy="0.000000000 0.000000000 0.000000000"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+  <link name="wheel_rr">
+    <visual>
+      <geometry><mesh filename="package://agrobot_description/meshes/wheel_rr.stl"/></geometry>
+    </visual>
+  </link>
+  <joint name="wheel_rr_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="wheel_rr"/>
+    <origin xyz="-0.317800254 -0.316000000 0.103505609" rpy="0.000000000 0.000000000 0.000000000"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+  <link name="d405_link">
+    <visual>
+      <geometry><mesh filename="package://agrobot_description/meshes/d405.stl"/></geometry>
+    </visual>
+  </link>
+  <joint name="d405_link_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="d405_link"/>
+    <origin xyz="0.533606281 0.009550556 0.203636340" rpy="0.007227583 0.261792858 0.001870621"/>
+  </joint>
+  <link name="d405_link_optical">
+  </link>
+  <joint name="d405_link_optical_joint" type="fixed">
+    <parent link="d405_link"/>
+    <child link="d405_link_optical"/>
+    <origin xyz="0.000000000 0.000000000 0.000000000" rpy="-1.570796327 0.000000000 -1.570796327"/>
+  </joint>
+  <link name="zedm_center">
+    <visual>
+      <geometry><mesh filename="package://agrobot_description/meshes/zedm.stl"/></geometry>
+    </visual>
+  </link>
+  <joint name="zedm_center_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="zedm_center"/>
+    <origin xyz="0.430335978 -0.008458000 0.718982834" rpy="0.000000000 0.349065850 0.000000000"/>
+  </joint>
+  <link name="zedm_left">
+  </link>
+  <joint name="zedm_left_joint" type="fixed">
+    <parent link="zedm_center"/>
+    <child link="zedm_left"/>
+    <origin xyz="0.000000000 0.031500000 0.000000000" rpy="0.000000000 0.000000000 0.000000000"/>
+  </joint>
+  <link name="zedm_right">
+  </link>
+  <joint name="zedm_right_joint" type="fixed">
+    <parent link="zedm_center"/>
+    <child link="zedm_right"/>
+    <origin xyz="0.000000000 -0.031500000 0.000000000" rpy="0.000000000 0.000000000 0.000000000"/>
+  </joint>
+  <link name="zedm_center_optical">
+  </link>
+  <joint name="zedm_center_optical_joint" type="fixed">
+    <parent link="zedm_center"/>
+    <child link="zedm_center_optical"/>
+    <origin xyz="0.000000000 0.000000000 0.000000000" rpy="-1.570796327 0.000000000 -1.570796327"/>
+  </joint>
+  <link name="zedm_left_optical">
+  </link>
+  <joint name="zedm_left_optical_joint" type="fixed">
+    <parent link="zedm_left"/>
+    <child link="zedm_left_optical"/>
+    <origin xyz="0.000000000 0.000000000 0.000000000" rpy="-1.570796327 0.000000000 -1.570796327"/>
+  </joint>
+  <link name="zedm_right_optical">
+  </link>
+  <joint name="zedm_right_optical_joint" type="fixed">
+    <parent link="zedm_right"/>
+    <child link="zedm_right_optical"/>
+    <origin xyz="0.000000000 0.000000000 0.000000000" rpy="-1.570796327 0.000000000 -1.570796327"/>
+  </joint>
+  <link name="cam_1">
+    <visual>
+      <geometry><mesh filename="package://agrobot_description/meshes/cam_1.stl"/></geometry>
+    </visual>
+  </link>
+  <joint name="cam_1_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="cam_1"/>
+    <origin xyz="0.262666478 0.042910903 1.632597380" rpy="0.000000000 0.000000000 0.000000000"/>
+  </joint>
+  <link name="cam_2">
+    <visual>
+      <geometry><mesh filename="package://agrobot_description/meshes/cam_2.stl"/></geometry>
+    </visual>
+  </link>
+  <joint name="cam_2_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="cam_2"/>
+    <origin xyz="0.262666478 0.042910903 2.632597380" rpy="0.000000000 0.000000000 0.000000000"/>
+  </joint>
+  <link name="cam_3">
+    <visual>
+      <geometry><mesh filename="package://agrobot_description/meshes/cam_3.stl"/></geometry>
+    </visual>
+  </link>
+  <joint name="cam_3_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="cam_3"/>
+    <origin xyz="0.262666478 0.042910903 3.632597380" rpy="0.000000000 0.000000000 0.000000000"/>
+  </joint>
+  <link name="cam_4">
+    <visual>
+      <geometry><mesh filename="package://agrobot_description/meshes/cam_4.stl"/></geometry>
+    </visual>
+  </link>
+  <joint name="cam_4_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="cam_4"/>
+    <origin xyz="-0.264828607 -0.043550170 1.632597380" rpy="0.000000000 0.000000000 0.000000000"/>
+  </joint>
+  <link name="cam_5">
+    <visual>
+      <geometry><mesh filename="package://agrobot_description/meshes/cam_5.stl"/></geometry>
+    </visual>
+  </link>
+  <joint name="cam_5_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="cam_5"/>
+    <origin xyz="-0.264828607 -0.043550170 3.632597380" rpy="0.000000000 0.000000000 0.000000000"/>
+  </joint>
+  <link name="cam_6">
+    <visual>
+      <geometry><mesh filename="package://agrobot_description/meshes/cam_6.stl"/></geometry>
+    </visual>
+  </link>
+  <joint name="cam_6_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="cam_6"/>
+    <origin xyz="-0.264828607 -0.043550170 2.632597380" rpy="0.000000000 0.000000000 0.000000000"/>
+  </joint>
+</robot>

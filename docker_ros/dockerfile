@@ -26,6 +26,8 @@ RUN set -eux; \
         python3-numpy \
         python3-colcon-common-extensions \
         ros-humble-rviz2 \
+        ros-humble-robot-state-publisher \
+        ros-humble-joint-state-publisher \
         libeigen3-dev \
         libopencv-dev \
         ros-humble-builtin-interfaces \
@@ -101,7 +103,8 @@ RUN set -eux; \
             -DBUILD_EXAMPLES=OFF \
             -DBUILD_GRAPHICAL_EXAMPLES=ON \
             -DBUILD_WITH_OPENMP=ON \
-            -DBUILD_WITH_RSUSB_BACKEND=ON; \
+            -DBUILD_WITH_RSUSB_BACKEND=ON \
+            -DIMPORT_DEPTH_CAM_FW=OFF; \
         cmake --build /tmp/librealsense/build -j"$(nproc)"; \
         cmake --install /tmp/librealsense/build; \
         ldconfig; \
