@@ -1,0 +1,21 @@
+greenhouse_pipe_rail_autodock:
+  ros__parameters:
+    detector:
+      bev_width: 720
+      bev_height: 720
+      source_points:
+      - 0.246063
+      - 0.055338
+      - 0.737182
+      - 0.027741
+      - 0.951851
+      - 0.569707
+      - 0.051012
+      - 0.620327
+      meters_per_pixel: 0.0017222
+      expected_spacing_m: 0.48
+      expected_spacing_px: 0.0
+      hard_spacing_tolerance_fraction: 0.34
+      require_crossbar: true
+      source_processing_width: 640
+      u_shape_processing_width: 360

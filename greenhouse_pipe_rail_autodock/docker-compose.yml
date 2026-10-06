@@ -1,0 +1,61 @@
+services:
+  pipe_rail_autodock:
+    build:
+      context: .
+    image: greenhouse-pipe-rail-autodock:jazzy
+    network_mode: host
+    ipc: host
+    environment:
+      DISPLAY: ${DISPLAY:-:0}
+      XAUTHORITY: /root/.Xauthority
+      QT_X11_NO_MITSHM: "1"
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      USE_VIDEO: ${USE_VIDEO:-false}
+      VIDEO_FILE: ${VIDEO_FILE:-}
+      CONTROL_ENABLED: ${CONTROL_ENABLED:-true}
+      VISUALIZE: ${VISUALIZE:-true}
+    volumes:
+      - ./ros2_ws:/ws
+      - ..:/data:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${XAUTHORITY_HOST:-${XAUTHORITY:-${HOME}/.Xauthority}}:/root/.Xauthority:ro
+    devices:
+      - /dev/dri:/dev/dri
+    command: >
+      bash -lc "
+      source /opt/ros/jazzy/setup.bash &&
+      cd /ws &&
+      colcon build --symlink-install &&
+      source install/setup.bash &&
+      ros2 launch greenhouse_pipe_rail_nav pipe_rail_autodock.launch.py
+      use_video:=$$USE_VIDEO
+      video_file:=$${VIDEO_FILE:-/tmp/unused.mp4}
+      visualize:=$$VISUALIZE
+      control_enabled:=$$CONTROL_ENABLED
+      "
+
+  # RViz in the browser via noVNC. No host DISPLAY / xhost.
+  #   docker compose --profile viz up --build rviz
+  #   http://<robot-ip>:6080/vnc.html?autoconnect=1&resize=scale
+  rviz:
+    profiles: ["viz"]
+    image: greenhouse-pipe-rail-autodock:jazzy
+    build:
+      context: .
+    network_mode: host
+    ipc: host
+    environment:
+      NOVNC_PORT: ${NOVNC_PORT:-6080}
+      LIBGL_ALWAYS_SOFTWARE: "1"
+      GALLIUM_DRIVER: llvmpipe
+      QT_QPA_PLATFORM: xcb
+      QT_X11_NO_MITSHM: "1"
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      REALSENSE_D405_SERIAL: ${REALSENSE_D405_SERIAL:-218622278337}
+    volumes:
+      - ./ros2_ws:/ws
+      - ..:/data:ro
+      - ./scripts/rviz_novnc.sh:/rviz_novnc.sh:ro
+      - /dev:/dev
+    privileged: true
+    command: ["bash", "/rviz_novnc.sh"]

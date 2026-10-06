@@ -1,0 +1,66 @@
+greenhouse_pipe_rail_autodock:
+  ros__parameters:
+    image_topic: /camera/camera/color/image_raw
+    cmd_vel_topic: /cmd_nav
+    annotated_topic: /pipe_rail/debug/annotated
+    bird_view_topic: /pipe_rail/debug/bird_view
+    control_enabled: true
+    visualize: true
+    publish_debug_images: true
+
+    # Controller. geometry_msgs/Twist uses x forward and y left.
+    approach_speed: 0.10
+    rail_drive_speed: 0.12
+    drive_distance_m: 2.0
+    drive_duration_s: 0.0
+    start_lock_distance_m: 0.12
+    start_slow_distance_m: 0.65
+    kp_lateral: 0.95
+    ki_lateral: 0.0
+    kd_lateral: 0.08
+    kp_heading: 1.40
+    ki_heading: 0.0
+    kd_heading: 0.10
+    max_lateral_speed: 0.16
+    max_yaw_rate: 0.35
+    max_lateral_integral: 0.08
+    max_heading_integral: 0.20
+    min_confidence: 0.25
+    lock_confidence: 0.48
+    lateral_lock_threshold_m: 0.035
+    heading_lock_threshold_deg: 5.0
+    stable_frames_to_lock: 12
+    lost_timeout_s: 0.45
+
+    detector:
+      bev_width: 720
+      bev_height: 720
+
+      # Four image points mapped into the bird-view rectangle:
+      # top-left, top-right, bottom-right, bottom-left.
+      # Values <= 1.5 are normalized image coordinates.
+      source_points: [0.12, 0.04, 0.88, 0.04, 0.98, 0.98, 0.02, 0.98]
+      destination_margin_px: 24.0
+
+      # Calibrate this from a known rail spacing after homography.
+      meters_per_pixel: 0.004
+      expected_spacing_m: 0.55
+      expected_spacing_px: 0.0
+      min_spacing_fraction: 0.16
+      max_spacing_fraction: 0.72
+      hard_spacing_tolerance_fraction: 0.65
+
+      max_line_angle_deg: 36.0
+      max_crossbar_angle_deg: 42.0
+      require_crossbar: true
+      min_segment_length_px: 70
+      hough_threshold: 42
+      max_line_gap_px: 42
+      cluster_window_px: 46.0
+      dark_delta: 26.0
+      blackhat_threshold: 11.0
+      source_processing_width: 640
+      u_shape_processing_width: 360
+      source_min_segment_length_px: 48
+      source_hough_threshold: 34
+      source_max_line_gap_px: 28
