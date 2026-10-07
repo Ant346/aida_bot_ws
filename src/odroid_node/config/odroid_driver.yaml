@@ -3,24 +3,24 @@ odroid_driver:
   ros__parameters:
     # uart_hoverboard = CH341 + старый бинарный протокол; socketcan_odrive = ODrive после slcan (can0/can1).
     transport: "socketcan_odrive"
-    # Шины: start_can.sh поднимает /dev/can_front как can0 и /dev/can_rear как can1, но адаптеры
-    # подключены наоборот: can0 физически идёт на ЗАДНИЙ ODrive, can1 на ПЕРЕДНИЙ.
+    # Шины: start_can.sh поднимает /dev/can_front (адаптер 208C33725931) как can0 и
+    # /dev/can_rear (адаптер 206932AA5052) как can1. CAN-провод переднего ODrive должен идти
+    # в адаптер can_front, заднего — в can_rear; от USB-порта ничего не зависит.
     # В параметрах ниже только имена из ip link (can0/can1), не пути /dev/...
     # Передняя ось (FL/FR).
-    can_interface: "can1"
+    can_interface: "can0"
     # Задняя ось (RL/RR). Если все четыре оси на одной шине — поставьте "" и задайте четыре
     # уникальных axis id на этой шине (например 0–3).
-    can_interface_rear: "can0"
+    can_interface_rear: "can1"
     can_bitrate: 250000
     # Раскладка (по одному ODrive на ось, node id 0 и 1 на каждой шине):
-    #   передний ODrive, can1: axis0 = FR, axis1 = FL
-    #   задний ODrive,   can0: axis0 = RL, axis1 = RR
-    # Выведено из поведения пульта, замеров знака wz навигацией и X-схемы роликов.
+    #   передний ODrive, can0: axis0 = FL, axis1 = FR
+    #   задний ODrive,   can1: axis0 = RR, axis1 = RL
     # Проверка: сервис test_wheel крутит FL — должно закрутиться переднее левое колесо вперёд.
-    axis_id_fl: 1
-    axis_id_fr: 0
-    axis_id_rl: 0
-    axis_id_rr: 1
+    axis_id_fl: 0
+    axis_id_fr: 1
+    axis_id_rl: 1
+    axis_id_rr: 0
 
     # Знак +velocity в ODrive должен совпадать с «вперёд» робота для каждого колеса.
     # Если при чистом vx перед и зад крутятся навстречу — выключите инверсию задней оси или

@@ -37,7 +37,7 @@ def generate_launch_description():
     # Включается через ENV ROBOT_SINGLE_CAN=true в docker-compose. В этом случае:
     #   - can_interface_rear="" → узел не пытается открыть заднюю шину
     #   - axis_id_rl=-1, axis_id_rr=-1 → задние моторы не получают команд
-    # Передняя ось (FL/FR) едет с тем же `can_interface` (can1, см. odroid_driver.yaml).
+    # Передняя ось (FL/FR) едет с тем же `can_interface` (can0, см. odroid_driver.yaml).
     # Поворот по \omega_z кинематически рассчитан под 4 колеса; с двумя поедет
     # «прямо» нормально, повороты будут с уводом — это ожидаемо.
     single_can = _env_bool('ROBOT_SINGLE_CAN', False)
