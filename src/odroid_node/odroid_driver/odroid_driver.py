@@ -42,6 +42,9 @@ class OdroidDriver(Node):
                 ('cmd_vel_subscribe_stamped', False),
                 # Калибровка поворота: множитель wz внутри кинематики (проскальзывание роликов).
                 ('yaw_gain', 1.0),
+                # X — оси роликов, касающихся пола, идут поперёк направления на центр робота;
+                # O — смотрят в центр (колёса стоят зеркально).
+                ('roller_layout', 'X'),
                 # Нет cmd_vel дольше этого (с) — колёса в ноль.
                 ('cmd_vel_timeout', 0.3),
                 ('wheel_radius', 0.095),
@@ -264,6 +267,10 @@ class OdroidDriver(Node):
         self.W = float(self.get_parameter('wheel_track').value) / 2.0
         self.max_speed = float(self.get_parameter('max_speed').value)
         self.yaw_gain = float(self.get_parameter('yaw_gain').value)
+        self.roller_layout = str(self.get_parameter('roller_layout').value).strip().upper()
+        if self.roller_layout not in ('X', 'O'):
+            self.get_logger().warning(f'roller_layout={self.roller_layout!r} — считаем X')
+            self.roller_layout = 'X'
         self.cmd_timeout = float(self.get_parameter('cmd_vel_timeout').value)
         self.lock = threading.Lock()
         self.target_vel = np.zeros(3)
@@ -317,10 +324,15 @@ class OdroidDriver(Node):
             return self.target_vel.tolist()
 
     def _wheel_omega_rad_s(self, vx, vy, wz):
-        """Меканум X-схемы: (vx, vy, wz) по REP-103 → рад/с колёс FL, FR, RL, RR (+ = вперёд)."""
+        """Меканум: (vx, vy, wz) по REP-103 → рад/с колёс FL, FR, RL, RR (+ = вперёд)."""
         r = max(self.R, 1e-6)
         lw = self.L + self.W
         wz *= self.yaw_gain
+        if self.roller_layout == 'O':
+            # Зеркальные ролики меняют знак бокового слагаемого. Плечо поворота у O-схемы почти
+            # нулевое (|W - L|), робот поворачивается проскальзыванием роликов, поэтому слагаемое
+            # поворота оставлено как у X, а величину подбирает yaw_gain.
+            vy = -vy
         fl = (vx - vy - lw * wz) / r
         fr = (vx + vy + lw * wz) / r
         rl = (vx + vy - lw * wz) / r
