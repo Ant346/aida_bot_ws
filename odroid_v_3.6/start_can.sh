@@ -134,6 +134,9 @@ setup_can() {
     echo "✓ $can_name is up and running"
 }
 
+# NB: адаптеры подключены наоборот — can0 (/dev/can_front) физически идёт на задний ODrive,
+# can1 (/dev/can_rear) на передний. Это учтено в src/odroid_node/config/odroid_driver.yaml.
+
 # Setup front CAN interface (use real device if available)
 if [ -n "$FRONT_REAL_DEVICE" ] && [ -e "$FRONT_REAL_DEVICE" ]; then
     if setup_can "$FRONT_REAL_DEVICE" "can0"; then

@@ -3,27 +3,24 @@ odroid_driver:
   ros__parameters:
     # uart_hoverboard = CH341 + старый бинарный протокол; socketcan_odrive = ODrive после slcan (can0/can1).
     transport: "socketcan_odrive"
-    # Устройства на хосте: /dev/can_front → после sudo odroid_v_3.6/start_can.sh это интерфейс can0;
-    # /dev/can_rear → can1. В параметрах ниже только имена из ip link (can0/can1), не пути /dev/...
-    can_interface: "can0"
-    # Вторая шина для RL/RR. Если все четыре ODrive на одном CAN — поставьте "" и задайте четыре
+    # Шины: start_can.sh поднимает /dev/can_front как can0 и /dev/can_rear как can1, но адаптеры
+    # подключены наоборот: can0 физически идёт на ЗАДНИЙ ODrive, can1 на ПЕРЕДНИЙ.
+    # В параметрах ниже только имена из ip link (can0/can1), не пути /dev/...
+    # Передняя ось (FL/FR).
+    can_interface: "can1"
+    # Задняя ось (RL/RR). Если все четыре оси на одной шине — поставьте "" и задайте четыре
     # уникальных axis id на этой шине (например 0–3).
-    can_interface_rear: "can1"
+    can_interface_rear: "can0"
     can_bitrate: 250000
-    # На каждой из двух изолированных шин node id часто снова 0 и 1. Если задняя шина отключена
-    # или имена после ip link другие — см. вывод ip link show (обычно can0 и can1).
-    axis_id_fl: 0
-    axis_id_fr: 1
-    axis_id_rl: 1
-    axis_id_rr: 0
-
-    # Odrv1 axis0 rr
-    # Odrv1 axis1 rl
-    # Odrv0 axis0 fl
-    # Odrv0 axis1 fr
-    # было так:
-    # axis_id_rl: 0
-    # axis_id_rr: 1
+    # Раскладка (по одному ODrive на ось, node id 0 и 1 на каждой шине):
+    #   передний ODrive, can1: axis0 = FR, axis1 = FL
+    #   задний ODrive,   can0: axis0 = RL, axis1 = RR
+    # Выведено из поведения пульта, замеров знака wz навигацией и X-схемы роликов.
+    # Проверка: сервис test_wheel крутит FL — должно закрутиться переднее левое колесо вперёд.
+    axis_id_fl: 1
+    axis_id_fr: 0
+    axis_id_rl: 0
+    axis_id_rr: 1
 
     # Знак +velocity в ODrive должен совпадать с «вперёд» робота для каждого колеса.
     # Если при чистом vx перед и зад крутятся навстречу — выключите инверсию задней оси или
@@ -46,5 +43,8 @@ odroid_driver:
     test_speed: 3.0
     simulation_mode: false
     cmd_vel_subscribe_stamped: false
-    angular_z_scale: 10.0
-    wheel_odometry_topic: "wheel_odometry"
+    # Множитель wz внутри кинематики. 10 сохраняет прежнее поведение пульта и навигации;
+    # подобрать замером поворота на месте (заказали N рад/с — получили N).
+    yaw_gain: 10.0
+    # Нет cmd_vel дольше этого (с) — колёса в ноль.
+    cmd_vel_timeout: 0.3

@@ -35,9 +35,9 @@ def generate_launch_description():
 
     # One-bus override: rear CAN bus is dead (адаптер отвалился, или нет порта).
     # Включается через ENV ROBOT_SINGLE_CAN=true в docker-compose. В этом случае:
-    #   - can_interface_rear="" → узел не пытается открыть can1
+    #   - can_interface_rear="" → узел не пытается открыть заднюю шину
     #   - axis_id_rl=-1, axis_id_rr=-1 → задние моторы не получают команд
-    # Передняя ось (FL/FR) едет с тем же `can_interface` (по умолчанию can0).
+    # Передняя ось (FL/FR) едет с тем же `can_interface` (can1, см. odroid_driver.yaml).
     # Поворот по \omega_z кинематически рассчитан под 4 колеса; с двумя поедет
     # «прямо» нормально, повороты будут с уводом — это ожидаемо.
     single_can = _env_bool('ROBOT_SINGLE_CAN', False)
@@ -109,6 +109,7 @@ def generate_launch_description():
                 'nav_cmd_vel_topic': '/cmd_nav',
                 'cmd_vel_out_topic': '/cmd_vel',
                 'watchdog_timeout_sec': 2.0,
+                'cmd_timeout_sec': 0.3,
                 'publish_rate_hz': 20.0,
                 'initial_navigation_mode': False,
                 'allow_nav_when_joy_lost': False,

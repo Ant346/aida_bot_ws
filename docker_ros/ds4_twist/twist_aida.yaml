@@ -1,5 +1,7 @@
 # Левый стик: вперёд/назад (linear.x). Правый стик: влево/вправо (linear.y).
-# L2 / R2: поворот на месте (angular.z).
+# L2 / R2: поворот на месте (angular.z), L2 — влево, R2 — вправо.
+# Twist по REP-103, как и у навигации: стик влево (axis_right_x > 0) = +linear.y,
+# поворот влево = +angular.z. Калибровки привода здесь нет, она в odroid_driver.yaml.
 ds4_twist:
   ros__parameters:
     inputs:
@@ -7,12 +9,10 @@ ds4_twist:
         x: axis_left_y
         y: axis_right_x
       angular:
-        z: axis_r2 - axis_l2
+        z: axis_l2 - axis_r2
     scales:
       linear:
         x: 2.0
-        # Минус: согласовать правый стик с base_link (y влево = +linear.y) и меканумом в odroid_driver.
-        # Автоном шлёт /cmd_nav без этого масштаба — навигация не затрагивается.
-        y: -1.0
+        y: 1.0
       angular:
         z: 1.0

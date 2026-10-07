@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""cmd_vel → mecanum wheels: UART (hoverboard framing) or SocketCAN (ODrive native protocol)."""
+"""cmd_vel → mecanum wheels: UART (hoverboard framing) or SocketCAN (ODrive native protocol).
+
+cmd_vel по REP-103: м/с и рад/с в base_link, +x вперёд, +y влево, +wz против часовой.
+"""
 
 import glob
 import os
@@ -37,8 +40,10 @@ class OdroidDriver(Node):
                 ('transport', 'uart_hoverboard'),  # socketcan_odrive | uart_hoverboard
                 ('simulation_mode', False),
                 ('cmd_vel_subscribe_stamped', False),
-                ('angular_z_scale', 2.0),
-                ('wheel_odometry_topic', 'wheel_odometry'),
+                # Калибровка поворота: множитель wz внутри кинематики (проскальзывание роликов).
+                ('yaw_gain', 1.0),
+                # Нет cmd_vel дольше этого (с) — колёса в ноль.
+                ('cmd_vel_timeout', 0.3),
                 ('wheel_radius', 0.095),
                 ('wheel_base', 0.635),
                 ('wheel_track', 0.72),
@@ -86,9 +91,6 @@ class OdroidDriver(Node):
             self.create_subscription(Twist, 'cmd_vel', self.cmd_vel_callback, 10)
             self.get_logger().info('cmd_vel: Twist')
 
-        otopic = self.get_parameter('wheel_odometry_topic').value
-        self.odom_pub = self.create_publisher(Twist, otopic, 10)
-
         self.create_service(Empty, 'test_wheel', self.test_wheel_callback)
 
         sim = bool(self.get_parameter('simulation_mode').value)
@@ -118,8 +120,7 @@ class OdroidDriver(Node):
         if self.rear_thread is not None:
             self.rear_thread.start()
 
-        self.create_timer(0.1, self._publish_odometry)
-        mode = ('simulation' if sim else self._transport_kind)
+        mode =('simulation' if sim else self._transport_kind)
         self.get_logger().info(f'odroid_driver ready (mode={mode})')
 
     def _can_mod(self):
@@ -262,8 +263,12 @@ class OdroidDriver(Node):
         self.L = float(self.get_parameter('wheel_base').value) / 2.0
         self.W = float(self.get_parameter('wheel_track').value) / 2.0
         self.max_speed = float(self.get_parameter('max_speed').value)
+        self.yaw_gain = float(self.get_parameter('yaw_gain').value)
+        self.cmd_timeout = float(self.get_parameter('cmd_vel_timeout').value)
         self.lock = threading.Lock()
         self.target_vel = np.zeros(3)
+        self._last_cmd_time = None
+        self._cmd_stale = False
 
     def _find_ch341_device(self, device_id):
         try:
@@ -293,17 +298,33 @@ class OdroidDriver(Node):
         self.cmd_vel_callback(msg.twist)
 
     def cmd_vel_callback(self, msg: Twist):
-        k = float(self.get_parameter('angular_z_scale').value)
         with self.lock:
-            self.target_vel[:] = msg.linear.x, msg.linear.y, msg.angular.z * k
+            self.target_vel[:] = msg.linear.x, msg.linear.y, msg.angular.z
+            self._last_cmd_time = time.monotonic()
+
+    def _target(self):
+        """(vx, vy, wz) последней команды; нули, если она старше cmd_vel_timeout."""
+        with self.lock:
+            if self._last_cmd_time is None:
+                return [0.0, 0.0, 0.0]
+            if time.monotonic() - self._last_cmd_time > self.cmd_timeout:
+                if not self._cmd_stale:
+                    self._cmd_stale = True
+                    self.get_logger().warning(
+                        f'cmd_vel: нет команд дольше {self.cmd_timeout:.2f} с — стоп')
+                return [0.0, 0.0, 0.0]
+            self._cmd_stale = False
+            return self.target_vel.tolist()
 
     def _wheel_omega_rad_s(self, vx, vy, wz):
+        """Меканум X-схемы: (vx, vy, wz) по REP-103 → рад/с колёс FL, FR, RL, RR (+ = вперёд)."""
         r = max(self.R, 1e-6)
         lw = self.L + self.W
-        fl = (vx - vy + lw * wz) / r
-        fr = (vx + vy - lw * wz) / r
-        rl = (vx + vy + lw * wz) / r
-        rr = (vx - vy - lw * wz) / r
+        wz *= self.yaw_gain
+        fl = (vx - vy - lw * wz) / r
+        fr = (vx + vy + lw * wz) / r
+        rl = (vx + vy - lw * wz) / r
+        rr = (vx - vy + lw * wz) / r
         return fl, fr, rl, rr
 
     def _inverse_kinematic_uart_scaled(self, vx, vy, wz):
@@ -345,8 +366,7 @@ class OdroidDriver(Node):
 
         while self.running and rclpy.ok():
             try:
-                with self.lock:
-                    vx, vy, wz = self.target_vel.tolist()
+                vx, vy, wz = self._target()
 
                 fl_r, fr_r, rl_r, rr_r = self._wheel_omega_rad_s(vx, vy, wz)
                 fl_t = fl_r * inv_fl / TAU
@@ -410,8 +430,7 @@ class OdroidDriver(Node):
         sim = bool(self.get_parameter('simulation_mode').value)
         while self.running and rclpy.ok():
             try:
-                with self.lock:
-                    vx, vy, wz = self.target_vel.tolist()
+                vx, vy, wz = self._target()
                 fi, fj, fk, fm = self._inverse_kinematic_uart_scaled(vx, vy, wz)
 
                 self._send_board_command(self.front_port, fi, fj, 'F')
@@ -428,8 +447,7 @@ class OdroidDriver(Node):
         sim = bool(self.get_parameter('simulation_mode').value)
         while self.running and rclpy.ok():
             try:
-                with self.lock:
-                    vx, vy, wz = self.target_vel.tolist()
+                vx, vy, wz = self._target()
                 fi, fj, fk, fm = self._inverse_kinematic_uart_scaled(vx, vy, wz)
                 self._send_board_command(self.rear_port, -fk, -fm, 'R')
                 if not sim and self.rear_port:
@@ -438,30 +456,6 @@ class OdroidDriver(Node):
             except Exception as e:
                 self.get_logger().error(f'UART rear loop: {e!s}')
                 time.sleep(0.8)
-
-    def _forward_kinematic_cmd_twist(self):
-        with self.lock:
-            vx_c, vy_c, wz_c = self.target_vel.tolist()
-
-        fl, fr, rl, rr = self._wheel_omega_rad_s(vx_c, vy_c, wz_c)
-        r = self.R
-        lw = self.L + self.W
-        vx = r * (fl + fr + rl + rr) / 4.0
-        vy = r * (-fl + fr - rl + rr) / 4.0
-        wz = r * (-fl + fr + rl - rr) / (4.0 * lw)
-        # как в старом hoverboard узле для Twist-«одометрии»:
-        return vx, wz, vy
-
-    def _publish_odometry(self):
-        try:
-            lx, lz, ay = self._forward_kinematic_cmd_twist()
-            m = Twist()
-            m.linear.x = float(lx)
-            m.linear.y = float(lz)
-            m.angular.z = float(ay)
-            self.odom_pub.publish(m)
-        except Exception as e:
-            self.get_logger().error(str(e))
 
     def test_wheel_callback(self, request, response):
         self.running = False
