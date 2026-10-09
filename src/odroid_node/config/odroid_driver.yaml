@@ -36,6 +36,10 @@ odroid_driver:
     baudrate: 115200
     timeout: 0.05
     wheel_radius: 0.095
+    # Обороты мотора на оборот колеса (редукторные мотор-колёса DDK). 1 — драйвер шлёт
+    # ODrive обороты колеса как обороты мотора, и робот едет в ~5 раз медленнее команды.
+    # Поднимать вместе со шкалами пульта: иначе джойстик станет в столько же раз быстрее.
+    gear_ratio: 1.0
     wheel_base: 0.635
     wheel_track: 0.72
     max_speed: 100
@@ -52,3 +56,16 @@ odroid_driver:
     yaw_gain: 10.0
     # Нет cmd_vel дольше этого (с) — колёса в ноль.
     cmd_vel_timeout: 0.3
+    # 0 = без ограничения. Круг от позы включения — только профиль calibrate
+    # (odroid_driver_calibrate.yaml, docker compose --profile calibrate).
+    max_linear_mps: 0.0
+    max_angular_rps: 0.0
+    max_wheel_turns_s: 0.0
+    # Плавный разгон и торможение команды (0 = без ограничения). Аварийный стоп идёт
+    # мимо: оси сразу уходят в IDLE.
+    max_linear_accel_mps2: 0.6
+    max_angular_accel_rps2: 2.0
+    travel_radius_limit_m: 0.0
+    yaw_travel_limit_rad: 0.0
+    # Пробел в любом окне снимает момент. Сторож должен быть жив, иначе колёса не едут.
+    require_safety_watchdog: true

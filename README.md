@@ -1,6 +1,6 @@
 # aida_bot_ws
 
-ROS 2 workspace. This repository uses **Git submodules** for vendored packages; clone them so paths like `ds4_driver_submodule/` and `src/realsense-ros/` are populated.
+ROS 2 workspace. This repository uses **Git submodules** for vendored packages; clone them so paths like `ds4_driver_submodule/`, `src/realsense-ros/`, and `inputshaping_robot/` are populated.
 
 ## Clone (recommended)
 
@@ -39,6 +39,7 @@ git submodule update --init --recursive
 |------|------------|-------------------------------------------|
 | `ds4_driver_submodule` | [naoki-mizuno/ds4_driver](https://github.com/naoki-mizuno/ds4_driver) | `humble` |
 | `src/realsense-ros` | [realsenseai/realsense-ros](https://github.com/realsenseai/realsense-ros) | `ros2-master` |
+| `inputshaping_robot` | [Maksanigilator/inputshaping_robot](https://github.com/Maksanigilator/inputshaping_robot) | `main` |
 
 Commits are pinned by this repo’s superproject; **`git submodule update`** checks out those pins. Use **`git submodule update --remote`** only if you intentionally want to move to the latest commit on the branch above (then commit the new submodule SHA in the parent repo).
 
@@ -84,3 +85,7 @@ Rebuild the image once after this change so it contains `robot_state_publisher` 
 ```bash
 docker compose --profile viz build rviz
 ```
+
+## Notes
+
+What changed on 2026-10-09 (ODrive, camera calibration, omni wheels) is in [docs/2026-10-09-odrive-calibration.md](docs/2026-10-09-odrive-calibration.md). Machine-oriented context for the same work is [ai_readme.md](ai_readme.md).

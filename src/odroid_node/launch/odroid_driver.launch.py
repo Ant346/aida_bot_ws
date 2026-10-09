@@ -20,9 +20,21 @@ def _env_str(name: str) -> str:
     return os.environ.get(name, '').strip()
 
 
+def _load_ros_params(path):
+    try:
+        import yaml
+    except ImportError:
+        return {}
+    with open(path, 'r', encoding='utf-8') as handle:
+        data = yaml.safe_load(handle) or {}
+    return (data.get('odroid_driver') or {}).get('ros__parameters') or {}
+
+
 def generate_launch_description():
     pkg = get_package_share_directory('odroid_node')
     defaults_path = os.path.join(pkg, 'config', 'odroid_driver.yaml')
+    calibrate_path = os.path.join(pkg, 'config', 'odroid_driver_calibrate.yaml')
+    calibrate = _env_bool('ODRIVE_CALIBRATE', False)
     overlays = {
         'use_sim_time': ParameterValue(
             LaunchConfiguration('use_sim_time'), value_type=bool),
@@ -55,9 +67,14 @@ def generate_launch_description():
         # CAN_INTERFACE_REAR="" по умолчанию — это не должно затирать can1 из yaml.
         overlays['can_interface_rear'] = can_interface_rear_env
 
+    if calibrate and os.path.isfile(calibrate_path):
+        overlays.update(_load_ros_params(calibrate_path))
+
     params = []
     if os.path.isfile(defaults_path):
         params.append(defaults_path)
+    if calibrate and os.path.isfile(calibrate_path):
+        params.append(calibrate_path)
     params.append(overlays)
 
     return LaunchDescription([
@@ -89,6 +106,21 @@ def generate_launch_description():
         LogInfo(
             msg='[odroid_driver] ROBOT_SINGLE_CAN=true → rear CAN disabled, RL/RR axes off',
             condition=IfCondition('true' if single_can else 'false'),
+        ),
+        LogInfo(
+            msg=(
+                '[odroid_driver] profile calibrate: не дальше '
+                + format(float(overlays.get('travel_radius_limit_m', 0.0)), 'g')
+                + ' м от позы включения драйвера'
+            ),
+            condition=IfCondition('true' if calibrate else 'false'),
+        ),
+        Node(
+            package='odroid_node',
+            executable='estop_space',
+            name='odroid_estop',
+            output='screen',
+            parameters=[defaults_path] if os.path.isfile(defaults_path) else [],
         ),
         Node(
             package='odroid_node',

@@ -59,37 +59,57 @@ fi
 
 source /opt/ros/jazzy/setup.bash
 
+if ! python3 -c "from apriltag import apriltag" >/dev/null 2>&1; then
+  apt-get update
+  apt-get install -y --no-install-recommends python3-apriltag
+fi
+
 # Same process graph as RViz. The Humble camera services are a different distro
 # and this Jazzy RViz will not receive their images.
-serial="${REALSENSE_D405_SERIAL:-218622278337}"
-serial="${serial#_}"
-# D405 is on USB 2. 848x480 color+depth overflows the link and no frames arrive.
-# 480x270x15 for both streams fits. initial_reset clears a stuck USB stream.
-ros2 launch realsense2_camera rs_launch.py \
-  camera_namespace:=d405 \
-  camera_name:=d405 \
-  device_type:=d405 \
-  serial_no:=_"${serial}" \
-  initial_reset:=true \
+# Color only: depth on the same USB link drops the calibration frames.
+# D435i on USB 2 fits 1280x720x15. D405 uses the same profile; override with
+# REALSENSE_D405_COLOR_PROFILE if that camera is on USB 3.
+export FASTDDS_BUILTIN_TRANSPORTS="${FASTDDS_BUILTIN_TRANSPORTS:-LARGE_DATA}"
+d435_color="${REALSENSE_D435_COLOR_PROFILE:-1280x720x15}"
+d405_color="${REALSENSE_D405_COLOR_PROFILE:-1280x720x15}"
+d405_serial="${REALSENSE_D405_SERIAL:-218622278337}"
+d405_serial="${d405_serial#_}"
+
+# Factory color camera_info is remapped aside. TartanCalib intrinsics are
+# published on the original topic. Backup: /ws/calib/d435_factory_color_1280x720.yaml
+ros2 launch /ws/calib/d435_color.launch.py \
+  camera_namespace:=d435 \
+  camera_name:=d435 \
+  device_type:=d435 \
   enable_color:=true \
-  enable_depth:=true \
+  enable_depth:=false \
   enable_infra1:=false \
   enable_infra2:=false \
   pointcloud.enable:=false \
   align_depth.enable:=false \
-  depth_module.color_profile:=480x270x15 \
-  depth_module.depth_profile:=480x270x15 \
-  >/tmp/novnc/d405.log 2>&1 &
-# ZED-M UVC frames are torn unless uvcvideo is loaded with quirks=128
-# (UVC_QUIRK_FIX_BANDWIDTH). 1344x376 is the VGA side-by-side mode.
-ros2 run v4l2_camera v4l2_camera_node --ros-args \
-  -r __ns:=/zedm \
-  -r __node:=zedm_camera \
-  -p video_device:=/dev/v4l/by-id/usb-Technologies__Inc._ZED-M-video-index0 \
-  -p pixel_format:=YUYV \
-  -p image_size:=[1344,376] \
-  -p camera_frame_id:=zedm_camera_optical_frame \
-  >/tmp/novnc/zedm.log 2>&1 &
+  rgb_camera.color_profile:="$d435_color" \
+  >/tmp/novnc/d435.log 2>&1 &
+python3 /ws/calib/publish_d435_camera_info.py \
+  >/tmp/novnc/d435_camera_info.log 2>&1 &
+
+# D405 is pinned by serial so it cannot take the D435.
+(
+  sleep 2
+  ros2 launch realsense2_camera rs_launch.py \
+    camera_namespace:=d405 \
+    camera_name:=d405 \
+    device_type:=d405 \
+    serial_no:="_${d405_serial}" \
+    enable_color:=true \
+    enable_depth:=false \
+    enable_infra1:=false \
+    enable_infra2:=false \
+    pointcloud.enable:=false \
+    align_depth.enable:=false \
+    depth_module.color_profile:="$d405_color"
+) >/tmp/novnc/d405.log 2>&1 &
+
+echo "Calibration frames, in this container: python3 /ws/capture_kalibr_frames.py"
 
 cd /ws
 colcon build --symlink-install

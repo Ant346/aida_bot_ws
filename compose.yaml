@@ -21,7 +21,13 @@ services:
     privileged: true
     network_mode: host
 
-  odroid_node:
+  # Обычный драйвер: без предела хода.
+  # Калибровка (не дальше 15 см от позы включения):
+  #   docker compose stop odroid_node
+  #   docker compose --profile calibrate up -d odroid_calibrate
+  # Обратно: stop odroid_calibrate && docker compose up -d odroid_node
+  # Оба сразу не запускать — один и тот же CAN.
+  odroid_node: &odroid_node
     build:
       context: ./docker_ros
       dockerfile: dockerfile
@@ -32,7 +38,7 @@ services:
       - ./build:/workspace/build
       - ./install:/workspace/install
       - /dev:/dev
-    environment:
+    environment: &odroid_env
       ROS_DISTRO: humble
       ROS_DOMAIN_ID: "0"
       COLCON_PACKAGES_SELECT: "odroid_node"
@@ -47,6 +53,7 @@ services:
       ROBOT_SINGLE_CAN: "${ROBOT_SINGLE_CAN:-false}"
       CAN_INTERFACE: "${CAN_INTERFACE:-}"
       CAN_INTERFACE_REAR: "${CAN_INTERFACE_REAR:-}"
+      ODRIVE_CALIBRATE: "false"
     entrypoint: ["/entrypoint.bash"]
     # Параметры CAN / UART в src/odroid_node/config/odroid_driver.yaml (transport, can_interface, axis_id_*).
     command: ["ros2", "launch", "odroid_node", "odroid_driver.launch.py"]
@@ -54,6 +61,13 @@ services:
     network_mode: host
     depends_on:
       - ds4driver
+
+  odroid_calibrate:
+    <<: *odroid_node
+    profiles: ["calibrate"]
+    environment:
+      <<: *odroid_env
+      ODRIVE_CALIBRATE: "true"
 
   # Legacy CH341 + hoverboard_driver (НЕ CAN). Не поднимать вместе с odroid_node:
   #   docker compose --profile hoverboard_serial up hoverboard_node

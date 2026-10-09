@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-numpy \
     python3-opencv \
     python3-yaml \
+    python3-apriltag \
     libgl1 \
     libgl1-mesa-dri \
     mesa-utils \
