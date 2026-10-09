@@ -92,6 +92,8 @@ class OdroidDriver(Node):
                 ('max_wheel_turns_s', 0.0),
                 ('max_linear_accel_mps2', 0.0),
                 ('max_angular_accel_rps2', 0.0),
+                ('max_linear_decel_mps2', 0.0),
+                ('max_angular_decel_rps2', 0.0),
                 ('travel_radius_limit_m', 0.0),
                 ('yaw_travel_limit_rad', 0.0),
                 ('require_safety_watchdog', True),
@@ -305,6 +307,8 @@ class OdroidDriver(Node):
         self.max_wheel_turns_s = float(self.get_parameter('max_wheel_turns_s').value)
         self.max_linear_accel_mps2 = float(self.get_parameter('max_linear_accel_mps2').value)
         self.max_angular_accel_rps2 = float(self.get_parameter('max_angular_accel_rps2').value)
+        self.max_linear_decel_mps2 = float(self.get_parameter('max_linear_decel_mps2').value)
+        self.max_angular_decel_rps2 = float(self.get_parameter('max_angular_decel_rps2').value)
         self._ramp_cmd = (0.0, 0.0, 0.0)
         self.travel_radius_limit_m = float(self.get_parameter('travel_radius_limit_m').value)
         self.yaw_travel_limit_rad = float(self.get_parameter('yaw_travel_limit_rad').value)
@@ -456,7 +460,8 @@ class OdroidDriver(Node):
         dt = min(dt, 0.05)
         vx, vy, wz = ramp_cmd(
             self._ramp_cmd, (vx, vy, wz), dt,
-            self.max_linear_accel_mps2, self.max_angular_accel_rps2)
+            self.max_linear_accel_mps2, self.max_angular_accel_rps2,
+            self.max_linear_decel_mps2, self.max_angular_decel_rps2)
         self._ramp_cmd = (vx, vy, wz)
         (
             self._fence_x,

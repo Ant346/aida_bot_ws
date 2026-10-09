@@ -92,23 +92,35 @@ def clamp_cmd(vx, vy, wz, max_linear, max_angular):
     return vx, vy, wz
 
 
-def ramp_cmd(prev, target, dt, max_linear_accel, max_angular_accel):
+def ramp_cmd(prev, target, dt, max_linear_accel, max_angular_accel,
+             max_linear_decel=None, max_angular_decel=None):
     """Шаг от prev к target не быстрее заданных ускорений. 0 = без ограничения.
 
     (vx, vy) меняется одним вектором, чтобы при разгоне не менялось направление.
+    Торможение — когда скорость уменьшается по модулю или меняет знак — ограничено
+    max_*_decel (None = как разгон).
     """
+    if max_linear_decel is None:
+        max_linear_decel = max_linear_accel
+    if max_angular_decel is None:
+        max_angular_decel = max_angular_accel
     pvx, pvy, pwz = prev
     vx, vy, wz = target
-    if max_linear_accel > 0.0:
+    braking = (math.hypot(vx, vy) < math.hypot(pvx, pvy)
+               or vx * pvx + vy * pvy < 0.0)
+    limit = max_linear_decel if braking else max_linear_accel
+    if limit > 0.0:
         dvx = vx - pvx
         dvy = vy - pvy
         delta = math.hypot(dvx, dvy)
-        step = max_linear_accel * dt
+        step = limit * dt
         if delta > step:
             vx = pvx + dvx * step / delta
             vy = pvy + dvy * step / delta
-    if max_angular_accel > 0.0:
-        step = max_angular_accel * dt
+    braking = abs(wz) < abs(pwz) or wz * pwz < 0.0
+    limit = max_angular_decel if braking else max_angular_accel
+    if limit > 0.0:
+        step = limit * dt
         wz = pwz + max(-step, min(step, wz - pwz))
     return vx, vy, wz
 
