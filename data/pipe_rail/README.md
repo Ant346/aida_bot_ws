@@ -61,8 +61,8 @@ source install/setup.bash
 ros2 run greenhouse_pipe_rail_nav rail_calibrate_floor \
   --color /data/frames_output_001/color_0000.jpg \
   --depth /data/frames_output_001/depth_0000.png \
-  --output /ws/calibration/floor_from_depth.yaml \
-  --debug /ws/analysis/calibration/floor_from_depth_debug.jpg \
+  --output /ws/pipe_rail/calibration/floor_from_depth.yaml \
+  --debug /ws/pipe_rail/analysis/calibration/floor_from_depth_debug.jpg \
   --x-half-width-m 0.62 \
   --y-near-m 0.70 \
   --y-far-m 1.80 \
@@ -75,10 +75,10 @@ but exact intrinsics are better.
 
 ## Run with Docker Compose
 
-From this directory:
+From the repo root (`aida_bot_ws`), not from this directory:
 
 ```bash
-docker compose up --build
+docker compose up pipe_rail_autodock
 ```
 
 By default it subscribes to `/camera/color/image_raw` and publishes `/cmd_nav`
@@ -86,13 +86,13 @@ By default it subscribes to `/camera/color/image_raw` and publishes `/cmd_nav`
 Pass a calibrated config with:
 
 ```bash
-docker compose run --rm pipe_rail_autodock bash -lc "source /opt/ros/jazzy/setup.bash && cd /ws && colcon build --symlink-install && source install/setup.bash && ros2 launch greenhouse_pipe_rail_nav pipe_rail_autodock.launch.py config_file:=/data/greenhouse_pipe_rail_autodock/calibration/floor_from_depth.yaml"
+docker compose run --rm pipe_rail_autodock bash -lc "source /opt/ros/jazzy/setup.bash && cd /ws && colcon build --symlink-install --packages-select greenhouse_pipe_rail_nav && source install/setup.bash && ros2 launch greenhouse_pipe_rail_nav pipe_rail_autodock.launch.py config_file:=/ws/pipe_rail/calibration/floor_from_depth.yaml"
 ```
 
 To replay the included sample video through ROS:
 
 ```bash
-USE_VIDEO=true VIDEO_FILE=/data/rgb_video_015.mp4 CONTROL_ENABLED=false docker compose up --build
+USE_VIDEO=true VIDEO_FILE=/ws/pipe_rail/analysis/videos/rgb_video_015.mp4 CONTROL_ENABLED=false docker compose up pipe_rail_autodock
 ```
 
 Set `CONTROL_ENABLED=false` for dry runs. The debug window is opened with OpenCV
@@ -115,7 +115,7 @@ RViz runs on a virtual display inside the container and is served with noVNC.
 This does not use the host `DISPLAY` or `xhost`.
 
 ```bash
-docker compose --profile viz up --build rviz
+docker compose --profile novnc up rviz_novnc
 ```
 
 On this machine open:
@@ -135,7 +135,7 @@ docker compose up pipe_rail_autodock
 
 ## Important calibration
 
-Edit `ros2_ws/src/greenhouse_pipe_rail_nav/config/default.yaml`.
+Edit `src/greenhouse_pipe_rail_nav/config/default.yaml`.
 
 The most important fields are:
 
@@ -168,7 +168,7 @@ After building the workspace in the container:
 
 ```bash
 source install/setup.bash
-ros2 run greenhouse_pipe_rail_nav rail_offline_demo /data/greenhouse_pipe_rail_autodock/analysis/screenshots/rgb_video_015_11s_greenhouse_pipe_rail.jpg --output /tmp/rail_debug.jpg
+ros2 run greenhouse_pipe_rail_nav rail_offline_demo /ws/pipe_rail/analysis/screenshots/rgb_video_015_11s_greenhouse_pipe_rail.jpg --output /tmp/rail_debug.jpg
 ```
 
 ## Video Benchmark
@@ -181,5 +181,5 @@ ros2 run greenhouse_pipe_rail_nav rail_benchmark_video /data/rgb_video_015.mp4 -
 Render a full comparison video with the calibrated bird view:
 
 ```bash
-ros2 run greenhouse_pipe_rail_nav rail_render_video /data/rgb_video_015.mp4 /data/greenhouse_pipe_rail_autodock/analysis/videos/rgb_video_015_source_detect_debug.mp4 --detector-config /data/greenhouse_pipe_rail_autodock/calibration/floor_from_depth.yaml
+ros2 run greenhouse_pipe_rail_nav rail_render_video /ws/pipe_rail/analysis/videos/rgb_video_015.mp4 /tmp/rgb_video_015_source_detect_debug.mp4 --detector-config /ws/pipe_rail/calibration/floor_from_depth.yaml
 ```

@@ -22,6 +22,8 @@ class CmdVelMuxNode(Node):
         self.declare_parameter('publish_rate_hz', 20.0)
         self.declare_parameter('initial_navigation_mode', False)
         self.declare_parameter('allow_nav_when_joy_lost', False)
+        # false — телеоп с клавиатуры: пропажа DS4 не обнуляет команду.
+        self.declare_parameter('require_joy_watchdog', True)
         self.declare_parameter('toggle_button_field', 'button_cross')
         self.declare_parameter('shaped_cmd_vel_topic', '/cmd_vel_shaped')
         self.declare_parameter('shaped_toggle_button_field', 'button_square')
@@ -45,6 +47,9 @@ class CmdVelMuxNode(Node):
         ).get_parameter_value().bool_value
         self._allow_nav_joy_lost = self.get_parameter(
             'allow_nav_when_joy_lost'
+        ).get_parameter_value().bool_value
+        self._require_joy = self.get_parameter(
+            'require_joy_watchdog'
         ).get_parameter_value().bool_value
         self._toggle_field = self.get_parameter(
             'toggle_button_field'
@@ -84,7 +89,8 @@ class CmdVelMuxNode(Node):
         self.get_logger().info(
             f'cmd_vel_mux: teleop={teleop_topic} nav={nav_topic} shaped={shaped_topic} '
             f'out={out_topic} status={status_topic} mode_topic={mode_topic} '
-            f'mode={self._mode_string()} nav_toggle={self._toggle_field} '
+            f'mode={self._mode_string()} joy_watchdog={self._require_joy} '
+            f'nav_toggle={self._toggle_field} '
             f'shaped_toggle={self._shaped_toggle_field}'
         )
 
@@ -160,7 +166,7 @@ class CmdVelMuxNode(Node):
         return msg if dt < self._cmd_timeout else Twist()
 
     def _tick(self):
-        joy_ok = self._joy_ok()
+        joy_ok = (not self._require_joy) or self._joy_ok()
 
         if not joy_ok:
             if self._allow_nav_joy_lost and self._nav_mode:

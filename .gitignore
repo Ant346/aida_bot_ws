@@ -1,11 +1,13 @@
 # --- Machine / repo-local ---
 cp210x-cfg
-# Пока не коммитим автопарковку. Комментарий нельзя писать в той же строке:
-# Git считает его частью шаблона, и каталог перестаёт игнорироваться.
-greenhouse_pipe_rail_autodock/
+# Кадры и вендорный TartanCalib. Пакет автопарковки лежит в src/greenhouse_pipe_rail_nav.
+data/pipe_rail/calib_intr/
+data/pipe_rail/calib_kalibr/
+data/pipe_rail/.tartancalib/
+old/pipe_rail_debug/
 
 # Росбэги и исходники CAD. Сетки для RViz остаются в
-# agro_cad/agrobot_description/meshes; копия в agro_cad/meshes — дубль.
+# agro_cad/agrobot_description/meshes. Дубль сеток и старые бэги лежат в old/.
 *.db3
 *.mcap
 rosbag_*/
@@ -15,6 +17,10 @@ src/rosbags/
 *.f3z
 *.f3d
 agro_cad/meshes/
+old/hoverboard_node/
+old/rosbag_05_05/
+old/rosbags/
+old/agro_cad_meshes/
 
 # --- ROS 2 workspace (colcon); matches at repo root and in sub-workspaces ---
 build/

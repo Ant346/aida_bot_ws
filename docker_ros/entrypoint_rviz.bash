@@ -11,8 +11,8 @@ fi
 # shellcheck source=/entrypoint-x11.bash
 [[ -f /entrypoint-x11.bash ]] && source /entrypoint-x11.bash
 
-if [[ -f /opt/ros/${ROS_DISTRO:-humble}/setup.bash ]]; then
-  source "/opt/ros/${ROS_DISTRO:-humble}/setup.bash"
+if [[ -f /opt/ros/${ROS_DISTRO:-jazzy}/setup.bash ]]; then
+  source "/opt/ros/${ROS_DISTRO:-jazzy}/setup.bash"
 fi
 if [[ -f /workspace/install/setup.bash ]]; then
   source /workspace/install/setup.bash

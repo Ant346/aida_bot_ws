@@ -67,8 +67,12 @@ def generate_launch_description():
         # CAN_INTERFACE_REAR="" по умолчанию — это не должно затирать can1 из yaml.
         overlays['can_interface_rear'] = can_interface_rear_env
 
+    file_params = _load_ros_params(defaults_path) if os.path.isfile(defaults_path) else {}
     if calibrate and os.path.isfile(calibrate_path):
+        file_params.update(_load_ros_params(calibrate_path))
         overlays.update(_load_ros_params(calibrate_path))
+    teleop_source = str(file_params.get('teleop_source', 'ds4')).strip().lower()
+    use_keyboard = teleop_source == 'keyboard'
 
     params = []
     if os.path.isfile(defaults_path):
@@ -93,6 +97,9 @@ def generate_launch_description():
             'enable_cmd_vel_mux',
             default_value='true',
             description='Run cmd_vel mux (DS4: cross=teleop/nav, square=cmd_vel_shaped)'),
+        LogInfo(
+            msg='[odroid_driver] teleop_source=' + teleop_source,
+        ),
         LogInfo(
             msg=(
                 '[odroid_driver] using ' + defaults_path
@@ -149,6 +156,20 @@ def generate_launch_description():
                 'shaped_cmd_vel_topic': '/cmd_vel_shaped',
                 'shaped_toggle_button_field': 'button_square',
                 'mode_topic': '/cmd_vel_mux/mode',
+                'require_joy_watchdog': not use_keyboard,
+            }],
+        ),
+        Node(
+            package='odroid_node',
+            executable='keyboard_teleop',
+            name='keyboard_teleop',
+            output='screen',
+            condition=IfCondition('true' if use_keyboard else 'false'),
+            parameters=[{
+                'cmd_vel_topic': '/cmd_vel_teleop',
+                'linear_mps': float(file_params.get('keyboard_linear_mps', 0.5)),
+                'strafe_mps': float(file_params.get('keyboard_strafe_mps', 0.5)),
+                'angular_rps': float(file_params.get('keyboard_angular_rps', 0.24)),
             }],
         ),
     ])

@@ -64,8 +64,8 @@ if ! python3 -c "from apriltag import apriltag" >/dev/null 2>&1; then
   apt-get install -y --no-install-recommends python3-apriltag
 fi
 
-# Same process graph as RViz. The Humble camera services are a different distro
-# and this Jazzy RViz will not receive their images.
+# These camera nodes open the USB devices. Do not start them together with
+# the compose services realsense and realsense_d405.
 # Color only: depth on the same USB link drops the calibration frames.
 # D435i on USB 2 fits 1280x720x15. D405 uses the same profile; override with
 # REALSENSE_D405_COLOR_PROFILE if that camera is on USB 3.
@@ -76,8 +76,8 @@ d405_serial="${REALSENSE_D405_SERIAL:-218622278337}"
 d405_serial="${d405_serial#_}"
 
 # Factory color camera_info is remapped aside. TartanCalib intrinsics are
-# published on the original topic. Backup: /ws/calib/d435_factory_color_1280x720.yaml
-ros2 launch /ws/calib/d435_color.launch.py \
+# published on the original topic. Backup: /ws/pipe_rail/calib/d435_factory_color_1280x720.yaml
+ros2 launch /ws/pipe_rail/calib/d435_color.launch.py \
   camera_namespace:=d435 \
   camera_name:=d435 \
   device_type:=d435 \
@@ -89,7 +89,7 @@ ros2 launch /ws/calib/d435_color.launch.py \
   align_depth.enable:=false \
   rgb_camera.color_profile:="$d435_color" \
   >/tmp/novnc/d435.log 2>&1 &
-python3 /ws/calib/publish_d435_camera_info.py \
+python3 /ws/pipe_rail/calib/publish_d435_camera_info.py \
   >/tmp/novnc/d435_camera_info.log 2>&1 &
 
 # D405 is pinned by serial so it cannot take the D435.
@@ -109,9 +109,9 @@ python3 /ws/calib/publish_d435_camera_info.py \
     depth_module.color_profile:="$d405_color"
 ) >/tmp/novnc/d405.log 2>&1 &
 
-echo "Calibration frames, in this container: python3 /ws/capture_kalibr_frames.py"
+echo "Calibration frames, in this container: python3 /ws/pipe_rail/tools/capture_kalibr_frames.py"
 
 cd /ws
-colcon build --symlink-install
+colcon build --symlink-install --packages-select greenhouse_pipe_rail_nav
 source install/setup.bash
 exec ros2 launch greenhouse_pipe_rail_nav pipe_rail_rviz.launch.py

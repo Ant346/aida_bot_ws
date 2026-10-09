@@ -1,6 +1,6 @@
 # aida_bot_ws
 
-ROS 2 workspace. This repository uses **Git submodules** for vendored packages; clone them so paths like `ds4_driver_submodule/`, `src/realsense-ros/`, and `inputshaping_robot/` are populated.
+ROS 2 workspace. This repository uses **Git submodules** for vendored packages; clone them so paths like `ds4_driver_submodule/` and `src/realsense-ros/` are populated.
 
 ## Clone (recommended)
 
@@ -39,7 +39,6 @@ git submodule update --init --recursive
 |------|------------|-------------------------------------------|
 | `ds4_driver_submodule` | [naoki-mizuno/ds4_driver](https://github.com/naoki-mizuno/ds4_driver) | `humble` |
 | `src/realsense-ros` | [realsenseai/realsense-ros](https://github.com/realsenseai/realsense-ros) | `ros2-master` |
-| `inputshaping_robot` | [Maksanigilator/inputshaping_robot](https://github.com/Maksanigilator/inputshaping_robot) | `main` |
 
 Commits are pinned by this repo’s superproject; **`git submodule update`** checks out those pins. Use **`git submodule update --remote`** only if you intentionally want to move to the latest commit on the branch above (then commit the new submodule SHA in the parent repo).
 
@@ -53,7 +52,7 @@ Each line should start with a space (submodule checked out at the expected commi
 
 ## Cameras
 
-D435, D405, and ZED-M each have their own Compose service (Humble, `network_mode: host`).
+D435, D405, and ZED-M each have their own Compose service (Jazzy, `network_mode: host`).
 
 ```bash
 docker compose up realsense          # D435, topics /camera/camera/...
@@ -85,6 +84,19 @@ Rebuild the image once after this change so it contains `robot_state_publisher` 
 ```bash
 docker compose --profile viz build rviz
 ```
+
+## Pipe-rail autodock
+
+The rail detector runs in Jazzy, the same distro as the driver. Twist goes to `/cmd_nav`. Do not start `rviz_novnc` together with `realsense` or `realsense_d405`: that container opens the same USB cameras.
+
+```bash
+docker compose up pipe_rail_autodock
+docker compose --profile novnc up rviz_novnc
+```
+
+Browser RViz: http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale
+
+Package: `src/greenhouse_pipe_rail_nav`. Calibration frames and TartanCalib live in `data/pipe_rail/`.
 
 ## Notes
 

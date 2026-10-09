@@ -74,3 +74,9 @@ odroid_driver:
     yaw_travel_limit_rad: 0.0
     # Пробел в любом окне снимает момент. Сторож должен быть жив, иначе колёса не едут.
     require_safety_watchdog: true
+    # ds4 — пульт публикует /cmd_vel_teleop, крест/квадрат переключают режим.
+    # keyboard — W/S стрелки, A/D, Q/E. Пробел по-прежнему аварийный стоп.
+    teleop_source: "keyboard"
+    keyboard_linear_mps: 0.5
+    keyboard_strafe_mps: 0.5
+    keyboard_angular_rps: 0.08

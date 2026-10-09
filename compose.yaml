@@ -11,7 +11,7 @@ services:
       - ./install:/workspace/install
       - /dev:/dev
     environment:
-      ROS_DISTRO: humble
+      ROS_DISTRO: jazzy
       ROS_DOMAIN_ID: "0"
       # Do not pull realsense2_camera into this service (slow / large); build only DS4.
       COLCON_PACKAGES_SELECT: "ds4_driver_msgs ds4_driver"
@@ -32,14 +32,13 @@ services:
       context: ./docker_ros
       dockerfile: dockerfile
     volumes:
-      - ./rosbag_05_05:/workspace/rosbag_05_05
       - ./ds4_driver_submodule:/workspace/ds4_driver_submodule
       - ./src:/workspace/src
       - ./build:/workspace/build
       - ./install:/workspace/install
       - /dev:/dev
     environment: &odroid_env
-      ROS_DISTRO: humble
+      ROS_DISTRO: jazzy
       ROS_DOMAIN_ID: "0"
       COLCON_PACKAGES_SELECT: "odroid_node"
       # --- Опциональные оверрайды CAN для launch'а одроида ---
@@ -69,32 +68,6 @@ services:
       <<: *odroid_env
       ODRIVE_CALIBRATE: "true"
 
-  # Legacy CH341 + hoverboard_driver (НЕ CAN). Не поднимать вместе с odroid_node:
-  #   docker compose --profile hoverboard_serial up hoverboard_node
-  hoverboard_node:
-    profiles: ["hoverboard_serial"]
-    build:
-      context: ./hoverboard_node
-      dockerfile: dockerfile
-    volumes:
-      - ./hoverboard_node:/workspace
-      - /dev:/dev
-    environment:
-      ROS_DISTRO: humble
-      ROS_DOMAIN_ID: "0"
-      HOVERBOARD_SIMULATION: "${HOVERBOARD_SIMULATION:-false}"
-    entrypoint: ["/entrypoint.bash"]
-    command:
-      [
-        "ros2",
-        "launch",
-        "hoverboard_node",
-        "hoverboard_driver.launch.py",
-        "simulation_mode:=${HOVERBOARD_SIMULATION:-false}",
-      ]
-    privileged: true
-    network_mode: host
-
   realsense:
     build:
       context: ./docker_ros
@@ -112,7 +85,7 @@ services:
       - ${XAUTHORITY_HOST:-${XAUTHORITY:-${HOME}/.Xauthority}}:/root/.Xauthority:ro
       - ${XDG_RUNTIME_DIR:-/run/user/1000}:/run/host-user-runtime:ro
     environment:
-      - ROS_DISTRO=humble
+      - ROS_DISTRO=jazzy
       - ROS_DOMAIN_ID=0
       # Сборка по умолчанию в entrypoint: sequential + 1 поток (низкий пик RAM).
       # Если много ядер и RAM: COLCON_EXECUTOR=parallel COLCON_PARALLEL_WORKERS=2 CMAKE_BUILD_PARALLEL_LEVEL=3
@@ -142,7 +115,7 @@ services:
       - ./install:/workspace/install
       - /dev:/dev
     environment:
-      - ROS_DISTRO=humble
+      - ROS_DISTRO=jazzy
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - COLCON_PACKAGES_SELECT=realsense2_camera_msgs realsense2_camera realsense2_description realsense_bringup
       - REALSENSE_D405_SERIAL=${REALSENSE_D405_SERIAL:-218622278337}
@@ -160,11 +133,11 @@ services:
     build:
       context: ./docker_ros/zedm
       dockerfile: Dockerfile
-    image: aida-zedm:humble
+    image: aida-zedm:jazzy
     volumes:
       - /dev:/dev
     environment:
-      - ROS_DISTRO=humble
+      - ROS_DISTRO=jazzy
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       # 2560x720 rgb8 is about 5.5 MB. Default Fast DDS buffers reject it and
       # the node spams "sequence size exceeds remaining buffer".
@@ -189,6 +162,81 @@ services:
     privileged: true
     network_mode: host
 
+  # Автопарковка по рельсам. Тот же ROS 2 Jazzy, что и драйвер, но свой colcon
+  # workspace: пакет один, данные калибровки лежат в /ws/pipe_rail.
+  pipe_rail_autodock:
+    build:
+      context: ./docker_ros/jazzy
+      dockerfile: Dockerfile
+    image: greenhouse-pipe-rail-autodock:jazzy
+    network_mode: host
+    ipc: host
+    environment:
+      DISPLAY: ${DISPLAY:-:0}
+      XAUTHORITY: /root/.Xauthority
+      QT_X11_NO_MITSHM: "1"
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      USE_VIDEO: ${USE_VIDEO:-false}
+      VIDEO_FILE: ${VIDEO_FILE:-}
+      CONTROL_ENABLED: ${CONTROL_ENABLED:-true}
+      VISUALIZE: ${VISUALIZE:-true}
+    volumes:
+      - ./src/greenhouse_pipe_rail_nav:/ws/src/greenhouse_pipe_rail_nav
+      - ./data/pipe_rail:/ws/pipe_rail
+      - ./agro_cad:/data/agro_cad:ro
+      - pipe_rail_build:/ws/build
+      - pipe_rail_install:/ws/install
+      - pipe_rail_log:/ws/log
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${XAUTHORITY_HOST:-${XAUTHORITY:-${HOME}/.Xauthority}}:/root/.Xauthority:ro
+    devices:
+      - /dev/dri:/dev/dri
+    command:
+      - bash
+      - -lc
+      - |
+        source /opt/ros/jazzy/setup.bash
+        cd /ws
+        colcon build --symlink-install --packages-select greenhouse_pipe_rail_nav
+        source install/setup.bash
+        exec ros2 launch greenhouse_pipe_rail_nav pipe_rail_autodock.launch.py \
+          use_video:=$${USE_VIDEO:-false} \
+          video_file:=$${VIDEO_FILE:-/tmp/unused.mp4} \
+          visualize:=$${VISUALIZE:-true} \
+          control_enabled:=$${CONTROL_ENABLED:-true}
+
+  # RViz в браузере. Сам открывает D435 и D405, поэтому не поднимать вместе
+  # с сервисами realsense и realsense_d405: камера на USB одна.
+  #   docker compose --profile novnc up rviz_novnc
+  #   http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale
+  rviz_novnc:
+    profiles: ["novnc"]
+    image: greenhouse-pipe-rail-autodock:jazzy
+    build:
+      context: ./docker_ros/jazzy
+      dockerfile: Dockerfile
+    network_mode: host
+    ipc: host
+    environment:
+      NOVNC_PORT: ${NOVNC_PORT:-6080}
+      LIBGL_ALWAYS_SOFTWARE: "1"
+      GALLIUM_DRIVER: llvmpipe
+      QT_QPA_PLATFORM: xcb
+      QT_X11_NO_MITSHM: "1"
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      REALSENSE_D405_SERIAL: ${REALSENSE_D405_SERIAL:-218622278337}
+    volumes:
+      - ./src/greenhouse_pipe_rail_nav:/ws/src/greenhouse_pipe_rail_nav
+      - ./data/pipe_rail:/ws/pipe_rail
+      - ./agro_cad:/data/agro_cad:ro
+      - ./docker_ros/jazzy/rviz_novnc.sh:/rviz_novnc.sh:ro
+      - pipe_rail_build:/ws/build
+      - pipe_rail_install:/ws/install
+      - pipe_rail_log:/ws/log
+      - /dev:/dev
+    privileged: true
+    command: ["bash", "/rviz_novnc.sh"]
+
   rviz:
     profiles: ["viz"]
     build:
@@ -207,7 +255,7 @@ services:
       - ${XAUTHORITY_HOST:-${XAUTHORITY:-${HOME}/.Xauthority}}:/root/.Xauthority:ro
       - ${XDG_RUNTIME_DIR:-/run/user/1000}:/run/host-user-runtime:ro
     environment:
-      - ROS_DISTRO=humble
+      - ROS_DISTRO=jazzy
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       # Match realsense: empty host DISPLAY breaks x11 discovery; default :0 for local sessions.
       - DISPLAY=${DISPLAY:-:0}
@@ -221,3 +269,8 @@ services:
     ipc: host
     entrypoint: ["/entrypoint_rviz.bash"]
     command: ["ros2", "launch", "/workspace/rviz_configs/agrobot.launch.py"]
+
+volumes:
+  pipe_rail_build:
+  pipe_rail_install:
+  pipe_rail_log:

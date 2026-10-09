@@ -4,14 +4,7 @@
 
 ## Сабмодуль
 
-`inputshaping_robot` снова в `.gitmodules`:
-
-- путь: `inputshaping_robot`
-- репозиторий: https://github.com/Maksanigilator/inputshaping_robot.git
-- ветка: `main`
-- зафиксированный коммит: `cb6d2df9336d26d55d7d2d46be3c0f68e384e585`
-
-Это стенд input shaping (Pico + MPU6050, Twist на `/cmd_vel_shaped`). В коммите `9b6e1c5` его убрали из суперпроекта; каталог на диске остался.
+`inputshaping_robot` убран из суперпроекта. Стенд input shaping (Pico + MPU6050) в этом репозитории больше не нужен.
 
 ## ODrive
 
@@ -59,7 +52,7 @@ ros2 service call /odroid_driver/clear_errors std_srvs/srv/Empty
 | fx, fy | 648.2, 648.4 | 891.9, 892.0 |
 | ошибка репроекции | 0.21 × 0.19 px | 0.17 × 0.20 px |
 
-Заводская калибровка D435 сохранена в `greenhouse_pipe_rail_autodock/ros2_ws/calib/d435_factory_color_1280x720.yaml`. На топик `/d435/d435/color/camera_info` вместо неё публикуются кастомные интринсики из `d435_color_1280x720.yaml` (скрипт `publish_d435_camera_info.py`). Заводское сообщение остаётся на `color/camera_info_factory`. У D435 заводской фокус расходился с кастомным на 2.1% (911 против 892), дисторсия на заводе была нулевой.
+Заводская калибровка D435 сохранена в `data/pipe_rail/calib/d435_factory_color_1280x720.yaml`. На топик `/d435/d435/color/camera_info` вместо неё публикуются кастомные интринсики из `d435_color_1280x720.yaml` (скрипт `publish_d435_camera_info.py`). Заводское сообщение остаётся на `color/camera_info_factory`. У D435 заводской фокус расходился с кастомным на 2.1% (911 против 892), дисторсия на заводе была нулевой.
 
 Экстринсики пары — сессия `calib_kalibr/20261009_001947`, файл `tartan/log1-camchain.yaml`. Доска 3×3, метка 50 мм, зазор 0.3 стороны метки (15 мм), id 6 на печати нет. С зазором 0.2 ошибка была около 3 px, этот результат не используется. С зазором 0.3 ошибка репроекции **0.18 px** на обеих камерах (`±[0.179, 0.124]` у D405 и `±[0.180, 0.127]` у D435).
 

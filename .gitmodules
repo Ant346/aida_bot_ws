@@ -8,8 +8,3 @@
 	url = https://github.com/realsenseai/realsense-ros.git
 	branch = ros2-master
 
-[submodule "inputshaping_robot"]
-	path = inputshaping_robot
-	url = https://github.com/Maksanigilator/inputshaping_robot.git
-	branch = main
-

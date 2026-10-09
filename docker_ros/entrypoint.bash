@@ -13,8 +13,8 @@ fi
 # shellcheck source=/entrypoint-x11.bash
 [[ -f /entrypoint-x11.bash ]] && source /entrypoint-x11.bash
 
-if [[ -f /opt/ros/${ROS_DISTRO:-humble}/setup.bash ]]; then
-    source "/opt/ros/${ROS_DISTRO:-humble}/setup.bash"
+if [[ -f /opt/ros/${ROS_DISTRO:-jazzy}/setup.bash ]]; then
+    source "/opt/ros/${ROS_DISTRO:-jazzy}/setup.bash"
 fi
 
 # Drop colcon build dirs for packages whose rosidl_adapter json was left corrupt
@@ -89,9 +89,23 @@ build_workspace() {
     colcon build --symlink-install "${COLCON_OPTS[@]}" --cmake-args \
         -DCMAKE_BUILD_TYPE=Release \
         --event-handlers console_direct+
+    printf '%s\n' "${ROS_DISTRO:-jazzy}" > /workspace/install/.ros_distro
 }
 
 setup_workspace_structure
+
+# Humble install/ cannot be sourced from a Jazzy image. Missing marker means
+# the tree was built before this distro switch.
+want_distro="${ROS_DISTRO:-jazzy}"
+have_distro=""
+if [[ -f /workspace/install/.ros_distro ]]; then
+    have_distro="$(tr -d '[:space:]' < /workspace/install/.ros_distro)"
+fi
+if [[ -f /workspace/install/setup.bash && "$have_distro" != "$want_distro" ]]; then
+    echo "colcon install is for ${have_distro:-an older distro}, image is ${want_distro}. Clearing build/ and install/."
+    # These paths are bind mounts. The mount point itself cannot be removed.
+    find /workspace/build /workspace/install -mindepth 1 -delete
+fi
 
 NEED_BUILD=false
 if [[ ! -f /workspace/install/setup.bash ]]; then
