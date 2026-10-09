@@ -58,15 +58,15 @@ odroid_driver:
     # Нет cmd_vel дольше этого (с) — колёса в ноль.
     cmd_vel_timeout: 0.3
     # Предел скорости для всего робота (пульт и навигация), м/с и рад/с; 0 = без ограничения.
-    # vx и vy режутся по отдельности: по диагонали до 1.41 м/с (круговой предел — потом).
-    max_linear_mps: 1.0
+    # vx и vy режутся по отдельности: по диагонали до 0.71 м/с (круговой предел — потом).
+    max_linear_mps: 0.5
     max_angular_rps: 0.24
     max_wheel_turns_s: 0.0
     # Круг от позы включения — только профиль calibrate
     # (odroid_driver_calibrate.yaml, docker compose --profile calibrate).
     # Разгон и торможение команды, м/с² и рад/с² (0 = без ограничения). Аварийный стоп идёт
     # мимо: оси сразу уходят в IDLE. Торможение — скорость падает по модулю или меняет знак.
-    max_linear_accel_mps2: 0.35
+    max_linear_accel_mps2: 0.175
     max_linear_decel_mps2: 1.0
     max_angular_accel_rps2: 1.2
     max_angular_decel_rps2: 4.5
