@@ -82,11 +82,14 @@ def keyboard_fresh(now):
 
 
 def clamp_cmd(vx, vy, wz, max_linear, max_angular):
-    linear = math.hypot(vx, vy)
-    if linear > max_linear > 0.0:
-        scale = max_linear / linear
-        vx *= scale
-        vy *= scale
+    """Предел скорости. 0 = без ограничения.
+
+    vx и vy режутся каждая отдельно, по диагонали выходит до max_linear * sqrt(2).
+    TODO: круговой предел (|(vx, vy)| <= max_linear) — вернуться позже.
+    """
+    if max_linear > 0.0:
+        vx = max(-max_linear, min(max_linear, vx))
+        vy = max(-max_linear, min(max_linear, vy))
     if max_angular > 0.0:
         wz = max(-max_angular, min(max_angular, wz))
     return vx, vy, wz

@@ -10,9 +10,10 @@ ds4_twist:
         y: axis_right_x
       angular:
         z: axis_l2 - axis_r2
+    # Полный ход стика/триггера = предел драйвера (max_linear_mps, max_angular_rps), между — линейно.
     scales:
       linear:
         x: 1.0
         y: 1.0
       angular:
-        z: 1.0
+        z: 0.24
