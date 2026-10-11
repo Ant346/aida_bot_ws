@@ -13,6 +13,7 @@ import time
 import numpy as np
 import rclpy
 import serial
+from ds4_driver_msgs.msg import Status
 from geometry_msgs.msg import Twist, TwistStamped
 from odroid_driver.motion_guard import (
     DRIVER_HEARTBEAT,
@@ -96,8 +97,14 @@ class OdroidDriver(Node):
                 ('travel_radius_limit_m', 0.0),
                 ('yaw_travel_limit_rad', 0.0),
                 ('require_safety_watchdog', True),
+                # Кнопка пульта: нажал — оси в IDLE, колёса крутятся от руки; ещё раз —
+                # снова держат. Пустая строка — выключено.
+                ('release_button_field', 'button_triangle'),
+                ('status_topic', '/status'),
             ],
         )
+        self._released = False
+        self._prev_release_pressed = False
 
         self.front_port = None
         self.rear_port = None
@@ -119,6 +126,11 @@ class OdroidDriver(Node):
         else:
             self.create_subscription(Twist, 'cmd_vel', self.cmd_vel_callback, 10)
             self.get_logger().info('cmd_vel: Twist')
+
+        self._release_field = str(self.get_parameter('release_button_field').value).strip()
+        if self._release_field:
+            self.create_subscription(
+                Status, str(self.get_parameter('status_topic').value), self._status_cb, 10)
 
         self.create_service(Empty, 'test_wheel', self.test_wheel_callback)
         self.create_service(Empty, '~/clear_errors', self._clear_errors_callback)
@@ -417,9 +429,21 @@ class OdroidDriver(Node):
             self.get_logger().info('clear_errors: ошибок не было')
         return response
 
+    def _status_cb(self, msg):
+        pressed = bool(getattr(msg, self._release_field, False))
+        if pressed and not self._prev_release_pressed:
+            self._released = not self._released
+            if self._released:
+                self.get_logger().warning('Моторы отпущены кнопкой, колёса свободны')
+            else:
+                self.get_logger().info('Моторы снова держат')
+        self._prev_release_pressed = pressed
+
     def _safety_block_reason(self):
         if estop_latched():
             return 'пробел / аварийный стоп'
+        if self._released:
+            return f'отпущены кнопкой {self._release_field}'
         if self._heartbeats is not None:
             fault = self._heartbeats.fault(
                 [(name, aid) for _bus, name, aid in self._can_axes()])
