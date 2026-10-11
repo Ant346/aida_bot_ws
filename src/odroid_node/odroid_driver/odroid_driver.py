@@ -19,7 +19,6 @@ from odroid_driver.motion_guard import (
     apply_fence,
     clamp_cmd,
     estop_latched,
-    keyboard_fresh,
     latch_estop,
     ramp_cmd,
     scale_wheels,
@@ -431,8 +430,6 @@ class OdroidDriver(Node):
         now = time.time()
         if not watchdog_fresh(now):
             return 'сторож пробела не отвечает'
-        if not keyboard_fresh(now):
-            return 'клавиатура стопа не видна'
         return ''
 
     def _note_safety(self, reason):

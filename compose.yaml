@@ -13,6 +13,8 @@ services:
     environment:
       ROS_DISTRO: jazzy
       ROS_DOMAIN_ID: "0"
+      # sitecustomize.py рядом с конфигом: hidraw пульта не роняется отчётом 0x81.
+      PYTHONPATH: /workspace/ds4_twist_config
       # Do not pull realsense2_camera into this service (slow / large); build only DS4.
       COLCON_PACKAGES_SELECT: "ds4_driver_msgs ds4_driver"
     entrypoint: ["/entrypoint.bash"]

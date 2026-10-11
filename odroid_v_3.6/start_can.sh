@@ -111,10 +111,10 @@ setup_can() {
     sleep 1
     
     # Attach serial device to CAN interface
-    # -o: open command, -s8: 8 data bits, -S: baudrate
+    # -o: open command, -s5: CAN 250 kbit/s (-s8 is 1 Mbit/s), -S: serial baudrate
     # Use real device path, not symlink
-    echo "  Running: slcand -o -s8 -S 115200 $real_device $can_name"
-    if ! slcand -o -s8 -S 115200 "$real_device" "$can_name"; then
+    echo "  Running: slcand -o -s5 -S 115200 $real_device $can_name"
+    if ! slcand -o -s5 -S 115200 "$real_device" "$can_name"; then
         echo "  ERROR: Failed to attach $real_device to $can_name"
         echo "  Check if device exists and is not in use"
         echo "  Try: ls -la $real_device"
