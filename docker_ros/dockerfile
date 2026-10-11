@@ -1,4 +1,4 @@
-FROM ros:humble
+FROM ros:jazzy
 
 # # 1. ПОЛНОСТЬЮ переписать sources.list в старом формате (удаляем .sources файлы)
 # RUN set -eux; \
@@ -9,7 +9,7 @@ FROM ros:humble
 #     rm -rf /var/lib/apt/lists/* && \
 #     apt-get update
 
-# ROS 2 APT is already configured in ros:humble (Deb822 .sources). Do not add
+# ROS 2 APT is already configured in ros:jazzy (Deb822 .sources). Do not add
 # ros2.list + a keyring file — APT errors with conflicting Signed-By for the
 # same http://packages.ros.org/ros2/ubuntu suite.
 
@@ -25,28 +25,28 @@ RUN set -eux; \
         python3-serial \
         python3-numpy \
         python3-colcon-common-extensions \
-        ros-humble-rviz2 \
-        ros-humble-robot-state-publisher \
-        ros-humble-joint-state-publisher \
+        ros-jazzy-rviz2 \
+        ros-jazzy-robot-state-publisher \
+        ros-jazzy-joint-state-publisher \
         libeigen3-dev \
         libopencv-dev \
-        ros-humble-builtin-interfaces \
-        ros-humble-cv-bridge \
-        ros-humble-diagnostic-updater \
-        ros-humble-geometry-msgs \
-        ros-humble-image-transport \
-        ros-humble-lifecycle-msgs \
-        ros-humble-nav-msgs \
-        ros-humble-rclcpp \
-        ros-humble-rclcpp-action \
-        ros-humble-rclcpp-components \
-        ros-humble-rclcpp-lifecycle \
-        ros-humble-ros-environment \
-        ros-humble-sensor-msgs \
-        ros-humble-std-msgs \
-        ros-humble-std-srvs \
-        ros-humble-tf2 \
-        ros-humble-tf2-ros \
+        ros-jazzy-builtin-interfaces \
+        ros-jazzy-cv-bridge \
+        ros-jazzy-diagnostic-updater \
+        ros-jazzy-geometry-msgs \
+        ros-jazzy-image-transport \
+        ros-jazzy-lifecycle-msgs \
+        ros-jazzy-nav-msgs \
+        ros-jazzy-rclcpp \
+        ros-jazzy-rclcpp-action \
+        ros-jazzy-rclcpp-components \
+        ros-jazzy-rclcpp-lifecycle \
+        ros-jazzy-ros-environment \
+        ros-jazzy-sensor-msgs \
+        ros-jazzy-std-msgs \
+        ros-jazzy-std-srvs \
+        ros-jazzy-tf2 \
+        ros-jazzy-tf2-ros \
         libgl1-mesa-dri \
         libgl1 \
         mesa-utils \
@@ -66,7 +66,7 @@ RUN set -eux; \
         xauth \
         && rm -rf /var/lib/apt/lists/*
 
-# librealsense2: the ros:humble image does not ship Ubuntu .debs for librealsense2-utils / -dev
+# librealsense2: the ros:jazzy image does not ship Ubuntu .debs for librealsense2-utils / -dev
 # (packages are not in the enabled APT suites). Options:
 #   - Default (0): build SDK from GitHub with RSUSB backend (no Intel APT, matches CMake >=2.56.6 in realsense2_camera).
 #   - USE_INTEL_LIBREALSENSE_APT=1: install from librealsense.realsenseai.com (needs reliable access to their CDN).
@@ -79,7 +79,7 @@ RUN set -eux; \
     if [ "${USE_INTEL_LIBREALSENSE_APT}" = "1" ]; then \
         mkdir -p /etc/apt/keyrings; \
         curl -sSf https://librealsense.realsenseai.com/Debian/librealsenseai.asc | gpg --dearmor -o /etc/apt/keyrings/librealsenseai.gpg; \
-        echo "deb [signed-by=/etc/apt/keyrings/librealsenseai.gpg] https://librealsense.realsenseai.com/Debian/apt-repo jammy main" \
+        echo "deb [signed-by=/etc/apt/keyrings/librealsenseai.gpg] https://librealsense.realsenseai.com/Debian/apt-repo noble main" \
             > /etc/apt/sources.list.d/librealsense.list; \
         apt-get update; \
         apt-get install -y --no-install-recommends \
@@ -133,7 +133,7 @@ RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master
     sed -i 's/plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-completions)/' /root/.zshrc
 
 # Install Python dependencies
-RUN pip3 install --no-cache-dir \
+RUN pip3 install --no-cache-dir --break-system-packages --ignore-installed \
     numpy \
     pyserial \
     matplotlib \
@@ -147,14 +147,14 @@ RUN pip3 install --no-cache-dir \
 # ds4_driver_submodule/README.md and ds4_driver_submodule/docker/Dockerfile.
 RUN set -eux; \
     git clone --depth 1 --branch devel https://github.com/naoki-mizuno/ds4drv /tmp/ds4drv; \
-    pip3 install --no-cache-dir /tmp/ds4drv; \
+    pip3 install --no-cache-dir --break-system-packages --ignore-installed /tmp/ds4drv; \
     rm -rf /tmp/ds4drv
 
 # Create a better zsh configuration
-RUN echo 'export PATH="/opt/ros/humble/bin:$PATH"' >> /root/.zshrc && \
-    echo 'export LD_LIBRARY_PATH="/usr/local/lib:/opt/ros/humble/lib:$LD_LIBRARY_PATH"' >> /root/.zshrc && \
-    echo 'export PYTHONPATH="/opt/ros/humble/lib/python3/dist-packages:$PYTHONPATH"' >> /root/.zshrc && \
-    echo 'export CMAKE_PREFIX_PATH="/usr/local:/opt/ros/humble:$CMAKE_PREFIX_PATH"' >> /root/.zshrc && \
+RUN echo 'export PATH="/opt/ros/jazzy/bin:$PATH"' >> /root/.zshrc && \
+    echo 'export LD_LIBRARY_PATH="/usr/local/lib:/opt/ros/jazzy/lib:$LD_LIBRARY_PATH"' >> /root/.zshrc && \
+    echo 'export PYTHONPATH="/opt/ros/jazzy/lib/python3/dist-packages:$PYTHONPATH"' >> /root/.zshrc && \
+    echo 'export CMAKE_PREFIX_PATH="/usr/local:/opt/ros/jazzy:$CMAKE_PREFIX_PATH"' >> /root/.zshrc && \
     echo 'alias ll="ls -la"' >> /root/.zshrc && \
     echo 'alias build="colcon build --symlink-install"' >> /root/.zshrc && \
     echo 'alias build-pkg="colcon build --packages-select"' >> /root/.zshrc && \
@@ -165,7 +165,7 @@ RUN echo 'export PATH="/opt/ros/humble/bin:$PATH"' >> /root/.zshrc && \
     echo 'alias ds4-status="ls -la /dev/input/js* && ls -la /dev/input/event*"' >> /root/.zshrc
 
 # Source ROS2 в zsh profile
-RUN echo "source /opt/ros/humble/setup.zsh" >> /root/.zshrc && \
+RUN echo "source /opt/ros/jazzy/setup.zsh" >> /root/.zshrc && \
     echo "source /workspace/install/setup.zsh" >> /root/.zshrc
 
 # Файл без ведущей точки — не теряется в контексте сборки; читается как /etc/tmux.conf и ~/.tmux.conf

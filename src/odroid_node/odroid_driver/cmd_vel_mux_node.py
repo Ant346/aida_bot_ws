@@ -17,9 +17,13 @@ class CmdVelMuxNode(Node):
         self.declare_parameter('nav_cmd_vel_topic', '/cmd_nav')
         self.declare_parameter('cmd_vel_out_topic', '/cmd_vel')
         self.declare_parameter('watchdog_timeout_sec', 2.0)
+        # Входная команда старше этого (с) считается пропавшей — на выход идёт ноль.
+        self.declare_parameter('cmd_timeout_sec', 0.3)
         self.declare_parameter('publish_rate_hz', 20.0)
         self.declare_parameter('initial_navigation_mode', False)
         self.declare_parameter('allow_nav_when_joy_lost', False)
+        # false — телеоп с клавиатуры: пропажа DS4 не обнуляет команду.
+        self.declare_parameter('require_joy_watchdog', True)
         self.declare_parameter('toggle_button_field', 'button_cross')
         self.declare_parameter('shaped_cmd_vel_topic', '/cmd_vel_shaped')
         self.declare_parameter('shaped_toggle_button_field', 'button_square')
@@ -35,11 +39,17 @@ class CmdVelMuxNode(Node):
         self._watchdog_timeout = self.get_parameter(
             'watchdog_timeout_sec'
         ).get_parameter_value().double_value
+        self._cmd_timeout = self.get_parameter(
+            'cmd_timeout_sec'
+        ).get_parameter_value().double_value
         self._nav_mode = self.get_parameter(
             'initial_navigation_mode'
         ).get_parameter_value().bool_value
         self._allow_nav_joy_lost = self.get_parameter(
             'allow_nav_when_joy_lost'
+        ).get_parameter_value().bool_value
+        self._require_joy = self.get_parameter(
+            'require_joy_watchdog'
         ).get_parameter_value().bool_value
         self._toggle_field = self.get_parameter(
             'toggle_button_field'
@@ -56,9 +66,9 @@ class CmdVelMuxNode(Node):
         self._teleop = Twist()
         self._nav = Twist()
         self._shaped = Twist()
-        self._have_teleop = False
-        self._have_nav = False
-        self._have_shaped = False
+        self._teleop_time = None
+        self._nav_time = None
+        self._shaped_time = None
 
         _mode_qos = QoSProfile(
             depth=1,
@@ -79,7 +89,8 @@ class CmdVelMuxNode(Node):
         self.get_logger().info(
             f'cmd_vel_mux: teleop={teleop_topic} nav={nav_topic} shaped={shaped_topic} '
             f'out={out_topic} status={status_topic} mode_topic={mode_topic} '
-            f'mode={self._mode_string()} nav_toggle={self._toggle_field} '
+            f'mode={self._mode_string()} joy_watchdog={self._require_joy} '
+            f'nav_toggle={self._toggle_field} '
             f'shaped_toggle={self._shaped_toggle_field}'
         )
 
@@ -137,34 +148,41 @@ class CmdVelMuxNode(Node):
 
     def _cb_teleop(self, msg: Twist):
         self._teleop = msg
-        self._have_teleop = True
+        self._teleop_time = self.get_clock().now()
 
     def _cb_nav(self, msg: Twist):
         self._nav = msg
-        self._have_nav = True
+        self._nav_time = self.get_clock().now()
 
     def _cb_shaped(self, msg: Twist):
         self._shaped = msg
-        self._have_shaped = True
+        self._shaped_time = self.get_clock().now()
+
+    def _fresh(self, msg: Twist, stamp) -> Twist:
+        """msg, если он пришёл не позже cmd_timeout_sec назад, иначе нулевой Twist."""
+        if stamp is None:
+            return Twist()
+        dt = (self.get_clock().now() - stamp).nanoseconds / 1e9
+        return msg if dt < self._cmd_timeout else Twist()
 
     def _tick(self):
-        joy_ok = self._joy_ok()
+        joy_ok = (not self._require_joy) or self._joy_ok()
 
         if not joy_ok:
-            if self._allow_nav_joy_lost and self._nav_mode and self._have_nav:
-                self._pub.publish(self._nav)
+            if self._allow_nav_joy_lost and self._nav_mode:
+                self._pub.publish(self._fresh(self._nav, self._nav_time))
             else:
                 self._pub.publish(Twist())
             return
 
         if self._shaped_mode:
-            self._pub.publish(self._shaped if self._have_shaped else Twist())
+            self._pub.publish(self._fresh(self._shaped, self._shaped_time))
             return
 
         if self._nav_mode:
-            self._pub.publish(self._nav if self._have_nav else Twist())
+            self._pub.publish(self._fresh(self._nav, self._nav_time))
         else:
-            self._pub.publish(self._teleop if self._have_teleop else Twist())
+            self._pub.publish(self._fresh(self._teleop, self._teleop_time))
 
 
 def main():

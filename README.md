@@ -52,7 +52,7 @@ Each line should start with a space (submodule checked out at the expected commi
 
 ## Cameras
 
-D435, D405, and ZED-M each have their own Compose service (Humble, `network_mode: host`).
+D435, D405, and ZED-M each have their own Compose service (Jazzy, `network_mode: host`).
 
 ```bash
 docker compose up realsense          # D435, topics /camera/camera/...
@@ -84,3 +84,20 @@ Rebuild the image once after this change so it contains `robot_state_publisher` 
 ```bash
 docker compose --profile viz build rviz
 ```
+
+## Pipe-rail autodock
+
+The rail detector runs in Jazzy, the same distro as the driver. Twist goes to `/cmd_nav`. Do not start `rviz_novnc` together with `realsense` or `realsense_d405`: that container opens the same USB cameras.
+
+```bash
+docker compose up pipe_rail_autodock
+docker compose --profile novnc up rviz_novnc
+```
+
+Browser RViz: http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale
+
+Package: `src/greenhouse_pipe_rail_nav`. Calibration frames and TartanCalib live in `data/pipe_rail/`.
+
+## Notes
+
+What changed on 2026-10-09 (ODrive, camera calibration, omni wheels) is in [docs/2026-10-09-odrive-calibration.md](docs/2026-10-09-odrive-calibration.md). Machine-oriented context for the same work is [ai_readme.md](ai_readme.md).

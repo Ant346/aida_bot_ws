@@ -9,7 +9,35 @@
     <child link="front_hit"/>
     <origin xyz="0.601704532 0.000000000 0.273101239" rpy="0.000000000 0.000000000 0.000000000"/>
   </joint>
-  <!-- 405:1+RealSense_D405:1/User Coordinate System1 -->
+  <!-- Модель прототипа 2025/upper right -->
+  <link name="wheel_fr"/>
+  <joint name="wheel_fr_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="wheel_fr"/>
+    <origin xyz="0.317800254 -0.316000000 0.103505609" rpy="0.000000000 0.000000000 0.000000000"/>
+  </joint>
+  <!-- Модель прототипа 2025/upper left -->
+  <link name="wheel_fl"/>
+  <joint name="wheel_fl_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="wheel_fl"/>
+    <origin xyz="0.317800254 0.316000000 0.103505609" rpy="0.000000000 0.000000000 0.000000000"/>
+  </joint>
+  <!-- Модель прототипа 2025/bottom right -->
+  <link name="wheel_rr"/>
+  <joint name="wheel_rr_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="wheel_rr"/>
+    <origin xyz="-0.317800254 -0.316000000 0.103505609" rpy="0.000000000 0.000000000 0.000000000"/>
+  </joint>
+  <!-- Модель прототипа 2025/bottom left -->
+  <link name="wheel_rl"/>
+  <joint name="wheel_rl_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="wheel_rl"/>
+    <origin xyz="-0.317800254 0.316000000 0.103505609" rpy="0.000000000 0.000000000 0.000000000"/>
+  </joint>
+  <!-- 405:1+RealSense_D405:1/D405 left -->
   <link name="d405_link"/>
   <joint name="d405_link_joint" type="fixed">
     <parent link="base_link"/>
@@ -22,43 +50,17 @@
     <child link="d405_link_optical"/>
     <origin xyz="0 0 0" rpy="-1.570796327 0.000000000 -1.570796327"/>
   </joint>
-  <!-- zedm_universal_box_forward:1+ZEDM:2/ZEDm center -->
-  <link name="zedm_center"/>
-  <joint name="zedm_center_joint" type="fixed">
+  <!-- Intel_RealSense_Depth_Camera_D435:1/User Coordinate System1 -->
+  <link name="d435_link"/>
+  <joint name="d435_link_joint" type="fixed">
     <parent link="base_link"/>
-    <child link="zedm_center"/>
-    <origin xyz="0.430335978 -0.008458000 0.718982834" rpy="0.000000000 0.349065850 0.000000000"/>
+    <child link="d435_link"/>
+    <origin xyz="0.451636729 -0.017499974 0.691293991" rpy="0.000000000 0.872664626 0.000000000"/>
   </joint>
-  <link name="zedm_center_optical"/>
-  <joint name="zedm_center_optical_joint" type="fixed">
-    <parent link="zedm_center"/>
-    <child link="zedm_center_optical"/>
-    <origin xyz="0 0 0" rpy="-1.570796327 0.000000000 -1.570796327"/>
-  </joint>
-  <!-- zedm_universal_box_forward:1+ZEDM:2/ZEDm right -->
-  <link name="zedm_right"/>
-  <joint name="zedm_right_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="zedm_right"/>
-    <origin xyz="0.430335978 -0.039958000 0.718982834" rpy="0.000000000 0.349065850 0.000000000"/>
-  </joint>
-  <link name="zedm_right_optical"/>
-  <joint name="zedm_right_optical_joint" type="fixed">
-    <parent link="zedm_right"/>
-    <child link="zedm_right_optical"/>
-    <origin xyz="0 0 0" rpy="-1.570796327 0.000000000 -1.570796327"/>
-  </joint>
-  <!-- zedm_universal_box_forward:1+ZEDM:2/ZEDm left -->
-  <link name="zedm_left"/>
-  <joint name="zedm_left_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="zedm_left"/>
-    <origin xyz="0.430335978 0.023042001 0.718982834" rpy="0.000000000 0.349065850 0.000000000"/>
-  </joint>
-  <link name="zedm_left_optical"/>
-  <joint name="zedm_left_optical_joint" type="fixed">
-    <parent link="zedm_left"/>
-    <child link="zedm_left_optical"/>
+  <link name="d435_link_optical"/>
+  <joint name="d435_link_optical_joint" type="fixed">
+    <parent link="d435_link"/>
+    <child link="d435_link_optical"/>
     <origin xyz="0 0 0" rpy="-1.570796327 0.000000000 -1.570796327"/>
   </joint>
 </robot>

@@ -111,10 +111,10 @@ setup_can() {
     sleep 1
     
     # Attach serial device to CAN interface
-    # -o: open command, -s8: 8 data bits, -S: baudrate
+    # -o: open command, -s5: CAN 250 kbit/s (-s8 is 1 Mbit/s), -S: serial baudrate
     # Use real device path, not symlink
-    echo "  Running: slcand -o -s8 -S 115200 $real_device $can_name"
-    if ! slcand -o -s8 -S 115200 "$real_device" "$can_name"; then
+    echo "  Running: slcand -o -s5 -S 115200 $real_device $can_name"
+    if ! slcand -o -s5 -S 115200 "$real_device" "$can_name"; then
         echo "  ERROR: Failed to attach $real_device to $can_name"
         echo "  Check if device exists and is not in use"
         echo "  Try: ls -la $real_device"
@@ -133,6 +133,9 @@ setup_can() {
     
     echo "✓ $can_name is up and running"
 }
+
+# can0 = передний ODrive, can1 = задний: CAN-провод переднего ODrive должен идти в адаптер
+# can_front (208C33725931), заднего — в can_rear (206932AA5052). См. odroid_driver.yaml.
 
 # Setup front CAN interface (use real device if available)
 if [ -n "$FRONT_REAL_DEVICE" ] && [ -e "$FRONT_REAL_DEVICE" ]; then

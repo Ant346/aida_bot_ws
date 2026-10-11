@@ -25,6 +25,7 @@ def generate_launch_description():
                 'nav_cmd_vel_topic': '/cmd_nav',
                 'cmd_vel_out_topic': '/cmd_vel',
                 'watchdog_timeout_sec': 2.0,
+                'cmd_timeout_sec': 0.3,
                 'publish_rate_hz': 20.0,
                 'initial_navigation_mode': False,
                 'allow_nav_when_joy_lost': False,

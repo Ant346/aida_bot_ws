@@ -1,7 +1,6 @@
 """Publish zero positions for the agrobot wheel joints.
 
-The Humble image does not always include joint_state_publisher. Fixed links
-still come from robot_state_publisher; the wheels need a JointState.
+Fixed links still come from robot_state_publisher; the wheels need a JointState.
 """
 
 import rclpy

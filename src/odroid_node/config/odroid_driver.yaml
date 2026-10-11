@@ -3,27 +3,24 @@ odroid_driver:
   ros__parameters:
     # uart_hoverboard = CH341 + старый бинарный протокол; socketcan_odrive = ODrive после slcan (can0/can1).
     transport: "socketcan_odrive"
-    # Устройства на хосте: /dev/can_front → после sudo odroid_v_3.6/start_can.sh это интерфейс can0;
-    # /dev/can_rear → can1. В параметрах ниже только имена из ip link (can0/can1), не пути /dev/...
+    # Шины: start_can.sh поднимает /dev/can_front (адаптер 208C33725931) как can0 и
+    # /dev/can_rear (адаптер 206932AA5052) как can1. CAN-провод переднего ODrive должен идти
+    # в адаптер can_front, заднего — в can_rear; от USB-порта ничего не зависит.
+    # В параметрах ниже только имена из ip link (can0/can1), не пути /dev/...
+    # Передняя ось (FL/FR).
     can_interface: "can0"
-    # Вторая шина для RL/RR. Если все четыре ODrive на одном CAN — поставьте "" и задайте четыре
+    # Задняя ось (RL/RR). Если все четыре оси на одной шине — поставьте "" и задайте четыре
     # уникальных axis id на этой шине (например 0–3).
     can_interface_rear: "can1"
     can_bitrate: 250000
-    # На каждой из двух изолированных шин node id часто снова 0 и 1. Если задняя шина отключена
-    # или имена после ip link другие — см. вывод ip link show (обычно can0 и can1).
+    # Раскладка (по одному ODrive на ось, node id 0 и 1 на каждой шине):
+    #   передний ODrive, can0: axis0 = FL, axis1 = FR
+    #   задний ODrive,   can1: axis0 = RR, axis1 = RL
+    # Проверка: сервис test_wheel крутит FL — должно закрутиться переднее левое колесо вперёд.
     axis_id_fl: 0
     axis_id_fr: 1
     axis_id_rl: 1
     axis_id_rr: 0
-
-    # Odrv1 axis0 rr
-    # Odrv1 axis1 rl
-    # Odrv0 axis0 fl
-    # Odrv0 axis1 fr
-    # было так:
-    # axis_id_rl: 0
-    # axis_id_rr: 1
 
     # Знак +velocity в ODrive должен совпадать с «вперёд» робота для каждого колеса.
     # Если при чистом vx перед и зад крутятся навстречу — выключите инверсию задней оси или
@@ -38,7 +35,13 @@ odroid_driver:
     rear_serial: "0002"
     baudrate: 115200
     timeout: 0.05
-    wheel_radius: 0.095
+    # Радиус колеса по CAD (agro_cad, сетка wheel_*.stl). Замер 2026-10-09 очень близок:
+    # 176.5 см проезда = 12.15 оборота мотора, при gear_ratio 4.4 это 0.1017 м (0.2% от CAD).
+    wheel_radius: 0.1015
+    # Обороты мотора на оборот колеса (редукторные мотор-колёса DDK 350 Вт). 4.4 — по подсчёту
+    # оборотов колеса (8.8 оборота мотора на 2 оборота колеса) и типичному паспорту таких втулок.
+    # Датчики Холла ODrive считают вал мотора, до редуктора.
+    gear_ratio: 4.4
     wheel_base: 0.635
     wheel_track: 0.72
     max_speed: 100
@@ -46,5 +49,34 @@ odroid_driver:
     test_speed: 3.0
     simulation_mode: false
     cmd_vel_subscribe_stamped: false
-    angular_z_scale: 10.0
-    wheel_odometry_topic: "wheel_odometry"
+    # Стандартная схема: снизу оси роликов, касающихся пола, смотрят от центра (ромб).
+    # Сверху это буква X. "O" — если колёса снова встанут зеркально, оси в центр.
+    roller_layout: "X"
+    # Множитель wz внутри кинематики. 1 — команда в рад/с без подкрутки под проскальзывание.
+    # Подобрать замером поворота на месте (заказали N рад/с — получили N).
+    yaw_gain: 1.0
+    # Нет cmd_vel дольше этого (с) — колёса в ноль.
+    cmd_vel_timeout: 0.3
+    # Предел скорости для всего робота (пульт и навигация), м/с и рад/с; 0 = без ограничения.
+    # vx и vy режутся по отдельности: по диагонали до 0.71 м/с (круговой предел — потом).
+    max_linear_mps: 0.5
+    max_angular_rps: 0.24
+    max_wheel_turns_s: 0.0
+    # Круг от позы включения — только профиль calibrate
+    # (odroid_driver_calibrate.yaml, docker compose --profile calibrate).
+    # Разгон и торможение команды, м/с² и рад/с² (0 = без ограничения). Аварийный стоп идёт
+    # мимо: оси сразу уходят в IDLE. Торможение — скорость падает по модулю или меняет знак.
+    max_linear_accel_mps2: 0.175
+    max_linear_decel_mps2: 1.0
+    max_angular_accel_rps2: 1.2
+    max_angular_decel_rps2: 4.5
+    travel_radius_limit_m: 0.0
+    yaw_travel_limit_rad: 0.0
+    # Сторож должен быть жив, иначе колёса не едут. Отсутствие клавиатуры момент не запрещает.
+    require_safety_watchdog: true
+    # ds4 — пульт публикует /cmd_vel_teleop, крест/квадрат переключают режим.
+    # keyboard — W/S стрелки, A/D, Q/E. Пробел по-прежнему аварийный стоп.
+    teleop_source: "ds4"
+    keyboard_linear_mps: 0.5
+    keyboard_strafe_mps: 0.5
+    keyboard_angular_rps: 0.08

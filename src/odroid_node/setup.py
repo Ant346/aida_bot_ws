@@ -20,7 +20,9 @@ setup(
     entry_points={
         'console_scripts': [
             'odroid_driver = odroid_driver.odroid_driver:main',
+            'estop_space = odroid_driver.estop_space:main',
             'cmd_vel_mux_node = odroid_driver.cmd_vel_mux_node:main',
+            'keyboard_teleop = odroid_driver.keyboard_teleop:main',
         ],
     },
 )

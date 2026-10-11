@@ -12,7 +12,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parent
 GLB = ROOT / "robot.glb"
-FRAMES = ROOT / "frames.json"
+FRAMES = ROOT / "framesd435.json"
 OUT = ROOT / "agrobot_description"
 MESH = OUT / "meshes"
 
@@ -272,8 +272,14 @@ def main():
         for k, v in wheel_defs.items()
     }
 
-    zed = next(fr for fr in by_name["ZEDm center"] if "ZEDM:2" in fr["path"])
-    d405 = by_name["User Coordinate System1"][0]
+    d405 = next(fr for fr in frames if fr.get("component") == "RealSense_D405")
+    d435 = next(
+        fr
+        for fr in frames
+        if "D435" in fr.get("component", "") or "D435" in fr.get("path", "")
+    )
+    zed_frames = [fr for fr in by_name.get("ZEDm center", []) if "ZEDM:2" in fr["path"]]
+    zed = zed_frames[0] if zed_frames else None
     front = by_name["agrobot forward"][0]
 
     wheel_roots = [
@@ -345,6 +351,8 @@ def main():
         joined = " / ".join(names)
         if "zedm_universal_box_forward" in joined or "ZEDM" in joined or "ZED M" in joined:
             return "zed"
+        if any("D435" in n or n.startswith("Intel_RealSense_Depth_Camera_D435") for n in names):
+            return "d435"
         if any(n.startswith("405:") or "RealSense_D405" in n for n in names):
             return "d405"
         if "camera supplier" in joined or "camera assembly" in joined:
@@ -452,13 +460,23 @@ def main():
 
     d405_origin = np.array(d405["origin_mm"], dtype=float)
     d405_axes = [np.array(v, dtype=float) for v in (d405["x_axis"], d405["y_axis"], d405["z_axis"])]
-    zed_origin = np.array(zed["origin_mm"], dtype=float)
-    zed_axes = [np.array(v, dtype=float) for v in (zed["x_axis"], zed["y_axis"], zed["z_axis"])]
+    d435_origin = np.array(d435["origin_mm"], dtype=float)
+    d435_axes = [np.array(v, dtype=float) for v in (d435["x_axis"], d435["y_axis"], d435["z_axis"])]
     d405_mesh = frame_mesh(cat("d405"), d405_origin, d405_axes)
-    zed_mesh = frame_mesh(cat("zed"), zed_origin, zed_axes)
+    d435_mesh = frame_mesh(cat("d435"), d435_origin, d435_axes)
     write_stl(MESH / "d405.stl", d405_mesh)
-    write_stl(MESH / "zedm.stl", zed_mesh)
-    print(f"d405 triangles {len(d405_mesh)}  zed triangles {len(zed_mesh)}")
+    if len(d435_mesh):
+        write_stl(MESH / "d435.stl", d435_mesh)
+    zed_mesh = np.zeros((0, 3, 3))
+    if zed is not None:
+        zed_origin = np.array(zed["origin_mm"], dtype=float)
+        zed_axes = [np.array(v, dtype=float) for v in (zed["x_axis"], zed["y_axis"], zed["z_axis"])]
+        zed_mesh = frame_mesh(cat("zed"), zed_origin, zed_axes)
+        write_stl(MESH / "zedm.stl", zed_mesh)
+    print(
+        f"d405 triangles {len(d405_mesh)}  d435 triangles {len(d435_mesh)}  "
+        f"zed triangles {len(zed_mesh)}"
+    )
 
     cam_keys = []
     for n in range(1, len(extra_roots) + 1):
@@ -540,12 +558,17 @@ def main():
     add_fixed("base_link", "d405_link", xyz, rpy, "d405.stl")
     add_fixed("d405_link", "d405_link_optical", (0, 0, 0), optical)
 
-    xyz, rpy = pose_in_base(zed)
-    add_fixed("base_link", "zedm_center", xyz, rpy, "zedm.stl")
-    add_fixed("zedm_center", "zedm_left", (0, 0.0315, 0), (0, 0, 0))
-    add_fixed("zedm_center", "zedm_right", (0, -0.0315, 0), (0, 0, 0))
-    for name in ("zedm_center", "zedm_left", "zedm_right"):
-        add_fixed(name, name + "_optical", (0, 0, 0), optical)
+    xyz, rpy = pose_in_base(d435)
+    add_fixed("base_link", "d435_link", xyz, rpy, "d435.stl" if len(d435_mesh) else None)
+    add_fixed("d435_link", "d435_link_optical", (0, 0, 0), optical)
+
+    if zed is not None:
+        xyz, rpy = pose_in_base(zed)
+        add_fixed("base_link", "zedm_center", xyz, rpy, "zedm.stl")
+        add_fixed("zedm_center", "zedm_left", (0, 0.0315, 0), (0, 0, 0))
+        add_fixed("zedm_center", "zedm_right", (0, -0.0315, 0), (0, 0, 0))
+        for name in ("zedm_center", "zedm_left", "zedm_right"):
+            add_fixed(name, name + "_optical", (0, 0, 0), optical)
 
     for key, cen in cam_keys:
         xyz = to_frame(cen.reshape(1, 3), base_origin, base_axes)[0] * 0.001

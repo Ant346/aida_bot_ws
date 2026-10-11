@@ -20,9 +20,21 @@ def _env_str(name: str) -> str:
     return os.environ.get(name, '').strip()
 
 
+def _load_ros_params(path):
+    try:
+        import yaml
+    except ImportError:
+        return {}
+    with open(path, 'r', encoding='utf-8') as handle:
+        data = yaml.safe_load(handle) or {}
+    return (data.get('odroid_driver') or {}).get('ros__parameters') or {}
+
+
 def generate_launch_description():
     pkg = get_package_share_directory('odroid_node')
     defaults_path = os.path.join(pkg, 'config', 'odroid_driver.yaml')
+    calibrate_path = os.path.join(pkg, 'config', 'odroid_driver_calibrate.yaml')
+    calibrate = _env_bool('ODRIVE_CALIBRATE', False)
     overlays = {
         'use_sim_time': ParameterValue(
             LaunchConfiguration('use_sim_time'), value_type=bool),
@@ -35,9 +47,9 @@ def generate_launch_description():
 
     # One-bus override: rear CAN bus is dead (адаптер отвалился, или нет порта).
     # Включается через ENV ROBOT_SINGLE_CAN=true в docker-compose. В этом случае:
-    #   - can_interface_rear="" → узел не пытается открыть can1
+    #   - can_interface_rear="" → узел не пытается открыть заднюю шину
     #   - axis_id_rl=-1, axis_id_rr=-1 → задние моторы не получают команд
-    # Передняя ось (FL/FR) едет с тем же `can_interface` (по умолчанию can0).
+    # Передняя ось (FL/FR) едет с тем же `can_interface` (can0, см. odroid_driver.yaml).
     # Поворот по \omega_z кинематически рассчитан под 4 колеса; с двумя поедет
     # «прямо» нормально, повороты будут с уводом — это ожидаемо.
     single_can = _env_bool('ROBOT_SINGLE_CAN', False)
@@ -55,9 +67,18 @@ def generate_launch_description():
         # CAN_INTERFACE_REAR="" по умолчанию — это не должно затирать can1 из yaml.
         overlays['can_interface_rear'] = can_interface_rear_env
 
+    file_params = _load_ros_params(defaults_path) if os.path.isfile(defaults_path) else {}
+    if calibrate and os.path.isfile(calibrate_path):
+        file_params.update(_load_ros_params(calibrate_path))
+        overlays.update(_load_ros_params(calibrate_path))
+    teleop_source = str(file_params.get('teleop_source', 'ds4')).strip().lower()
+    use_keyboard = teleop_source == 'keyboard'
+
     params = []
     if os.path.isfile(defaults_path):
         params.append(defaults_path)
+    if calibrate and os.path.isfile(calibrate_path):
+        params.append(calibrate_path)
     params.append(overlays)
 
     return LaunchDescription([
@@ -77,6 +98,9 @@ def generate_launch_description():
             default_value='true',
             description='Run cmd_vel mux (DS4: cross=teleop/nav, square=cmd_vel_shaped)'),
         LogInfo(
+            msg='[odroid_driver] teleop_source=' + teleop_source,
+        ),
+        LogInfo(
             msg=(
                 '[odroid_driver] using ' + defaults_path
                 if os.path.isfile(defaults_path)
@@ -89,6 +113,21 @@ def generate_launch_description():
         LogInfo(
             msg='[odroid_driver] ROBOT_SINGLE_CAN=true → rear CAN disabled, RL/RR axes off',
             condition=IfCondition('true' if single_can else 'false'),
+        ),
+        LogInfo(
+            msg=(
+                '[odroid_driver] profile calibrate: не дальше '
+                + format(float(overlays.get('travel_radius_limit_m', 0.0)), 'g')
+                + ' м от позы включения драйвера'
+            ),
+            condition=IfCondition('true' if calibrate else 'false'),
+        ),
+        Node(
+            package='odroid_node',
+            executable='estop_space',
+            name='odroid_estop',
+            output='screen',
+            parameters=[defaults_path] if os.path.isfile(defaults_path) else [],
         ),
         Node(
             package='odroid_node',
@@ -109,6 +148,7 @@ def generate_launch_description():
                 'nav_cmd_vel_topic': '/cmd_nav',
                 'cmd_vel_out_topic': '/cmd_vel',
                 'watchdog_timeout_sec': 2.0,
+                'cmd_timeout_sec': 0.3,
                 'publish_rate_hz': 20.0,
                 'initial_navigation_mode': False,
                 'allow_nav_when_joy_lost': False,
@@ -116,6 +156,20 @@ def generate_launch_description():
                 'shaped_cmd_vel_topic': '/cmd_vel_shaped',
                 'shaped_toggle_button_field': 'button_square',
                 'mode_topic': '/cmd_vel_mux/mode',
+                'require_joy_watchdog': not use_keyboard,
+            }],
+        ),
+        Node(
+            package='odroid_node',
+            executable='keyboard_teleop',
+            name='keyboard_teleop',
+            output='screen',
+            condition=IfCondition('true' if use_keyboard else 'false'),
+            parameters=[{
+                'cmd_vel_topic': '/cmd_vel_teleop',
+                'linear_mps': float(file_params.get('keyboard_linear_mps', 0.5)),
+                'strafe_mps': float(file_params.get('keyboard_strafe_mps', 0.5)),
+                'angular_rps': float(file_params.get('keyboard_angular_rps', 0.24)),
             }],
         ),
     ])

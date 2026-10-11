@@ -1,9 +1,9 @@
-"""Собрать фиксированные TF в base_link из frames.json.
+"""Собрать фиксированные TF в base_link из выгрузки СК Fusion.
 
 Родитель — СК agrobot main (геометрический центр).
 Оси этой СК уже ROS: X вперёд, Y влево, Z вверх.
 Кадры камер в файле — те же оси, начало в оптическом центре.
-Оптический кадр (X вправо, Y вниз, Z вперёд) — ребёнок этого кадра.
+Оптический кадр (X вправо, Y вниз, Z вперёд) — ребёнок кадра камеры.
 """
 
 import json
@@ -12,8 +12,15 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-SRC = ROOT / "frames.json"
+SRC = ROOT / "framesd435.json"
 URDF = ROOT / "agrobot_frames.urdf"
+
+WHEELS = {
+    "upper left": "wheel_fl",
+    "upper right": "wheel_fr",
+    "bottom left": "wheel_rl",
+    "bottom right": "wheel_rr",
+}
 
 
 def dot(a, b):
@@ -48,27 +55,26 @@ def rpy_from_axes(child_axes_in_parent):
     return roll, pitch, yaw
 
 
-def zed_occurrence(frame):
-    path = frame["path"]
-    marker = "ZEDM:"
-    if marker not in path:
-        return None
-    return path.split(marker, 1)[1].split("/", 1)[0].split("+", 1)[0]
-
-
 def link_name(frame):
     name = frame["name"]
+    component = frame.get("component", "")
+    path = frame.get("path", "")
     if name == "agrobot main":
         return "base_link"
     if name == "agrobot forward":
         return "front_hit"
-    if frame["component"] == "RealSense_D405" or name == "User Coordinate System1":
+    if name in WHEELS:
+        return WHEELS[name]
+    if component == "RealSense_D405" or "RealSense_D405" in path:
         return "d405_link"
-    if name.startswith("ZEDm"):
-        side = name.split()[-1]
-        return f"zedm_{side}"
+    if "D435" in component or "D435" in path:
+        return "d435_link"
     safe = "".join(ch if ch.isalnum() else "_" for ch in name)
     return safe
+
+
+def is_camera(child):
+    return child in ("d405_link", "d435_link")
 
 
 def in_root_space(payload, frame):
@@ -89,7 +95,7 @@ def main():
     for frame in frames:
         if frame is base:
             continue
-        if frame["name"].startswith("ZEDm") and zed_occurrence(frame) != "2":
+        if frame["name"].startswith("ZEDm") or frame.get("component") == "ZEDM":
             skipped.append(frame)
             continue
         if in_root_space(payload, frame):
@@ -130,7 +136,7 @@ def main():
             )
         )
         lines.append("  </joint>")
-        if child not in ("front_hit",):
+        if is_camera(child):
             optical = child + "_optical"
             lines.append(f'  <link name="{optical}"/>')
             lines.append(f'  <joint name="{optical}_joint" type="fixed">')
@@ -163,10 +169,10 @@ def main():
         return math.sqrt(sum((a[i] - b[i]) ** 2 for i in range(3))) * 1000.0
 
     print("baselines mm")
-    if "zedm_left" in by_name and "zedm_right" in by_name:
+    if "d405_link" in by_name and "d435_link" in by_name:
         print(
-            "  zedm_left <-> zedm_right: "
-            f"{dist_mm(by_name['zedm_left'][0], by_name['zedm_right'][0]):.3f}"
+            "  d405_link <-> d435_link: "
+            f"{dist_mm(by_name['d405_link'][0], by_name['d435_link'][0]):.3f}"
         )
 
 

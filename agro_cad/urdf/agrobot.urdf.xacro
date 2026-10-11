@@ -74,6 +74,20 @@
     <child link="d405_link_optical"/>
     <origin xyz="0.000000000 0.000000000 0.000000000" rpy="-1.570796327 0.000000000 -1.570796327"/>
   </joint>
+  <link name="d435_link">
+  </link>
+  <joint name="d435_link_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="d435_link"/>
+    <origin xyz="0.451636729 -0.017499974 0.691293991" rpy="0.000000000 0.872664626 0.000000000"/>
+  </joint>
+  <link name="d435_link_optical">
+  </link>
+  <joint name="d435_link_optical_joint" type="fixed">
+    <parent link="d435_link"/>
+    <child link="d435_link_optical"/>
+    <origin xyz="0.000000000 0.000000000 0.000000000" rpy="-1.570796327 0.000000000 -1.570796327"/>
+  </joint>
   <link name="zedm_center">
     <visual>
       <geometry><mesh filename="package://agrobot_description/meshes/zedm.stl"/></geometry>
