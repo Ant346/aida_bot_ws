@@ -77,6 +77,9 @@ odroid_driver:
     # ds4 — пульт публикует /cmd_vel_teleop, крест/квадрат переключают режим.
     # keyboard — W/S стрелки, A/D, Q/E. Пробел по-прежнему аварийный стоп.
     teleop_source: "ds4"
+    # Треугольник на пульте: моторы отпущены (IDLE, колёса крутятся от руки) / снова держат.
+    # Крест и квадрат заняты переключателем cmd_vel_mux. "" — выключить.
+    release_button_field: "button_triangle"
     keyboard_linear_mps: 0.5
     keyboard_strafe_mps: 0.5
     keyboard_angular_rps: 0.08

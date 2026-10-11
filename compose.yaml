@@ -43,6 +43,10 @@ services:
       ROS_DISTRO: jazzy
       ROS_DOMAIN_ID: "0"
       COLCON_PACKAGES_SELECT: "odroid_node"
+      # Только UDP. У контейнера nav2 общая память хоста (ipc: host) и другой
+      # пользователь, у этого своя: через разделяемую память команды /cmd_nav
+      # не доходят, хотя топик виден. Потоки здесь маленькие, UDP хватает.
+      FASTDDS_BUILTIN_TRANSPORTS: UDPv4
       # --- Опциональные оверрайды CAN для launch'а одроида ---
       # Если задняя CAN-шина мертва (нет адаптера, нет порта на ноуте, и т.п.) —
       # подними так: `ROBOT_SINGLE_CAN=true docker compose up odroid_node`.
