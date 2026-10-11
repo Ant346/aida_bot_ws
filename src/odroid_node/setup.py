@@ -23,6 +23,7 @@ setup(
             'estop_space = odroid_driver.estop_space:main',
             'cmd_vel_mux_node = odroid_driver.cmd_vel_mux_node:main',
             'keyboard_teleop = odroid_driver.keyboard_teleop:main',
+            'motor_current = odroid_driver.motor_current:main',
         ],
     },
 )

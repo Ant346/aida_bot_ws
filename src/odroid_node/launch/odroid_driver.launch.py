@@ -4,7 +4,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
@@ -74,6 +74,11 @@ def generate_launch_description():
     teleop_source = str(file_params.get('teleop_source', 'ds4')).strip().lower()
     use_keyboard = teleop_source == 'keyboard'
 
+    can_keys = ['can_interface', 'can_interface_rear'] + [
+        f'{p}_{w}' for p in ('axis_id', 'can_invert') for w in ('fl', 'fr', 'rl', 'rr')]
+    current_params = {k: v for k, v in {**file_params, **overlays}.items() if k in can_keys}
+    use_can = str(file_params.get('transport', '')).replace('-', '_').lower() == 'socketcan_odrive'
+
     params = []
     if os.path.isfile(defaults_path):
         params.append(defaults_path)
@@ -135,6 +140,16 @@ def generate_launch_description():
             name='odroid_driver',
             output='screen',
             parameters=params,
+        ),
+        Node(
+            package='odroid_node',
+            executable='motor_current',
+            name='motor_current',
+            output='screen',
+            condition=IfCondition(PythonExpression([
+                "'", 'true' if use_can else 'false', "' == 'true' and '",
+                LaunchConfiguration('simulation_mode'), "' != 'true'"])),
+            parameters=[current_params],
         ),
         Node(
             package='odroid_node',
