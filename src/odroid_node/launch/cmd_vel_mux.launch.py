@@ -2,7 +2,7 @@
 Mux: teleop vs nav vs shaped -> /cmd_vel.
 
 - Cross (button_cross): teleop <-> auto (cmd_nav).
-- Square (button_square): shaped <-> previous teleop/auto choice.
+- Square is disabled (shaped_toggle_button_field is empty).
 
 Remap ds4_twist: cmd_vel -> cmd_vel_teleop
 Publish shaped commands to cmd_vel_shaped.
@@ -31,7 +31,7 @@ def generate_launch_description():
                 'allow_nav_when_joy_lost': False,
                 'toggle_button_field': 'button_cross',
                 'shaped_cmd_vel_topic': '/cmd_vel_shaped',
-                'shaped_toggle_button_field': 'button_square',
+                'shaped_toggle_button_field': '',
                 'mode_topic': '/cmd_vel_mux/mode',
             }],
         ),

@@ -100,11 +100,21 @@ class OdroidDriver(Node):
                 # Кнопка пульта: нажал — оси в IDLE, колёса крутятся от руки; ещё раз —
                 # снова держат. Пустая строка — выключено.
                 ('release_button_field', 'button_triangle'),
+                # R1 переключает разгон по плоскости: обычный max_linear_accel_mps2
+                # или accel_boost_mps2. Повторное нажатие возвращает обычный.
+                # Пустая строка — выключено, разгон всегда обычный.
+                ('accel_toggle_button_field', 'button_r1'),
+                ('accel_boost_mps2', 1.0),
                 ('status_topic', '/status'),
             ],
         )
         self._released = False
         self._prev_release_pressed = False
+        self._accel_fast = False
+        self._prev_accel_pressed = False
+        self._accel_toggle_field = str(
+            self.get_parameter('accel_toggle_button_field').value).strip()
+        self._accel_boost_mps2 = float(self.get_parameter('accel_boost_mps2').value)
 
         self.front_port = None
         self.rear_port = None
@@ -128,7 +138,7 @@ class OdroidDriver(Node):
             self.get_logger().info('cmd_vel: Twist')
 
         self._release_field = str(self.get_parameter('release_button_field').value).strip()
-        if self._release_field:
+        if self._release_field or self._accel_toggle_field:
             self.create_subscription(
                 Status, str(self.get_parameter('status_topic').value), self._status_cb, 10)
 
@@ -320,6 +330,11 @@ class OdroidDriver(Node):
         self.max_angular_accel_rps2 = float(self.get_parameter('max_angular_accel_rps2').value)
         self.max_linear_decel_mps2 = float(self.get_parameter('max_linear_decel_mps2').value)
         self.max_angular_decel_rps2 = float(self.get_parameter('max_angular_decel_rps2').value)
+        if self._accel_toggle_field:
+            self.get_logger().info(
+                'Разгон %.3f м/с², %s переключает на %.3f м/с²' % (
+                    self.max_linear_accel_mps2, self._accel_toggle_field,
+                    self._accel_boost_mps2))
         self._ramp_cmd = (0.0, 0.0, 0.0)
         self.travel_radius_limit_m = float(self.get_parameter('travel_radius_limit_m').value)
         self.yaw_travel_limit_rad = float(self.get_parameter('yaw_travel_limit_rad').value)
@@ -429,15 +444,28 @@ class OdroidDriver(Node):
             self.get_logger().info('clear_errors: ошибок не было')
         return response
 
+    def _linear_accel_limit(self):
+        if self._accel_fast and self._accel_boost_mps2 > 0.0:
+            return self._accel_boost_mps2
+        return self.max_linear_accel_mps2
+
     def _status_cb(self, msg):
-        pressed = bool(getattr(msg, self._release_field, False))
-        if pressed and not self._prev_release_pressed:
-            self._released = not self._released
-            if self._released:
-                self.get_logger().warning('Моторы отпущены кнопкой, колёса свободны')
-            else:
-                self.get_logger().info('Моторы снова держат')
-        self._prev_release_pressed = pressed
+        if self._release_field:
+            pressed = bool(getattr(msg, self._release_field, False))
+            if pressed and not self._prev_release_pressed:
+                self._released = not self._released
+                if self._released:
+                    self.get_logger().warning('Моторы отпущены кнопкой, колёса свободны')
+                else:
+                    self.get_logger().info('Моторы снова держат')
+            self._prev_release_pressed = pressed
+        if self._accel_toggle_field:
+            pressed = bool(getattr(msg, self._accel_toggle_field, False))
+            if pressed and not self._prev_accel_pressed:
+                self._accel_fast = not self._accel_fast
+                self.get_logger().info(
+                    'Разгон %.3f м/с²' % self._linear_accel_limit())
+            self._prev_accel_pressed = pressed
 
     def _safety_block_reason(self):
         if estop_latched():
@@ -481,7 +509,7 @@ class OdroidDriver(Node):
         dt = min(dt, 0.05)
         vx, vy, wz = ramp_cmd(
             self._ramp_cmd, (vx, vy, wz), dt,
-            self.max_linear_accel_mps2, self.max_angular_accel_rps2,
+            self._linear_accel_limit(), self.max_angular_accel_rps2,
             self.max_linear_decel_mps2, self.max_angular_decel_rps2)
         self._ramp_cmd = (vx, vy, wz)
         (

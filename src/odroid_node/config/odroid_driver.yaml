@@ -67,6 +67,9 @@ odroid_driver:
     # Разгон и торможение команды, м/с² и рад/с² (0 = без ограничения). Аварийный стоп идёт
     # мимо: оси сразу уходят в IDLE. Торможение — скорость падает по модулю или меняет знак.
     max_linear_accel_mps2: 0.175
+    # R1 на пульте переключает разгон на это значение и обратно на max_linear_accel_mps2.
+    accel_boost_mps2: 1.0
+    accel_toggle_button_field: "button_r1"
     max_linear_decel_mps2: 1.0
     max_angular_accel_rps2: 1.2
     max_angular_decel_rps2: 4.5

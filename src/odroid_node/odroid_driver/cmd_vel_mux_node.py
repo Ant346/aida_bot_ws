@@ -121,6 +121,10 @@ class CmdVelMuxNode(Node):
             self.get_logger().error(f'Unknown toggle_button_field: {self._toggle_field}')
             self._prev_toggle_pressed = False
 
+        # Пустое имя кнопки отключает shaped. Квадрат сейчас не используется:
+        # иначе он перекрывает крестик и teleop/nav с пульта не переключаются.
+        if not self._shaped_toggle_field:
+            return
         try:
             raw_sq = getattr(msg, self._shaped_toggle_field)
             sq = bool(raw_sq)

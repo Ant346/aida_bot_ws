@@ -101,7 +101,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'enable_cmd_vel_mux',
             default_value='true',
-            description='Run cmd_vel mux (DS4: cross=teleop/nav, square=cmd_vel_shaped)'),
+            description='Run cmd_vel mux (DS4: cross=teleop/nav)'),
         LogInfo(
             msg='[odroid_driver] teleop_source=' + teleop_source,
         ),
@@ -169,7 +169,7 @@ def generate_launch_description():
                 'allow_nav_when_joy_lost': False,
                 'toggle_button_field': 'button_cross',
                 'shaped_cmd_vel_topic': '/cmd_vel_shaped',
-                'shaped_toggle_button_field': 'button_square',
+                'shaped_toggle_button_field': '',
                 'mode_topic': '/cmd_vel_mux/mode',
                 'require_joy_watchdog': not use_keyboard,
             }],
